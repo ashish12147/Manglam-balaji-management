@@ -52,13 +52,15 @@ export interface AuthSessionPayload {
   accessTokenExpiresAt: string;
   refreshToken: string;
   refreshTokenExpiresAt: string;
-  profile: ResidentProfile;
+  sessionId: string;
+  tokenType: 'Bearer';
 }
 
 export interface OtpChallenge {
   challengeId: string;
   expiresAt: string;
-  resendAvailableAt: string;
+  resendAfterSeconds: number;
+  status: 'QUEUED';
 }
 
 export interface VisitEvent {

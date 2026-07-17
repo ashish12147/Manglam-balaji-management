@@ -39,39 +39,62 @@ function query(options: ListOptions = {}): string {
   return value ? `?${value}` : '';
 }
 
+export interface AuthDeviceInput {
+  fingerprint: string;
+  platform: 'ANDROID' | 'IOS' | 'WEB' | 'UNKNOWN';
+}
+
 export const authApi = {
-  requestOtp: (body: { deviceId: string; phone: string }) =>
+  requestOtp: (body: { deviceNonce: string; phone: string }) =>
     apiClient.request<OtpChallenge>('/auth/otp/request', {
       auth: false,
-      body: { ...body, purpose: 'RESIDENT_LOGIN' },
+      body: { ...body, purpose: 'LOGIN' },
+      idempotencyKey: createIdempotencyKey('otp-request'),
       method: 'POST',
       retryAuth: false,
     }),
-  verifyOtp: (body: { challengeId: string; code: string; deviceId: string }) =>
+  verifyOtp: (
+    body: {
+      challengeId: string;
+      code: string;
+      device: AuthDeviceInput;
+      deviceNonce: string;
+      phone: string;
+    },
+    idempotencyKey: string,
+  ) =>
     apiClient.request<AuthSessionPayload>('/auth/otp/verify', {
       auth: false,
-      body,
+      body: { ...body, purpose: 'LOGIN' },
+      idempotencyKey,
       method: 'POST',
       retryAuth: false,
     }),
-  refresh: (body: { deviceId: string; refreshToken: string }) =>
+  refresh: (body: { deviceFingerprint: string; refreshToken: string }, idempotencyKey: string) =>
     apiClient.request<AuthSessionPayload>('/auth/refresh', {
       auth: false,
       body,
+      idempotencyKey,
       method: 'POST',
       retryAuth: false,
     }),
-  logout: (refreshToken: string) =>
+  logout: () =>
     apiClient.request<void>('/auth/logout', {
-      body: { refreshToken },
+      idempotencyKey: createIdempotencyKey('session-logout'),
       method: 'POST',
       retryAuth: false,
     }),
-  setupPin: (pin: string) => apiClient.request<void>('/auth/pin', { body: { pin }, method: 'PUT' }),
-  unlockPin: (body: { deviceId: string; phone: string; pin: string }) =>
+  setupPin: (pin: string) =>
+    apiClient.request<void>('/auth/pin', {
+      body: { pin },
+      idempotencyKey: createIdempotencyKey('pin-setup'),
+      method: 'PUT',
+    }),
+  unlockPin: (body: { device: AuthDeviceInput; phone: string; pin: string }) =>
     apiClient.request<AuthSessionPayload>('/auth/pin/unlock', {
       auth: false,
       body,
+      idempotencyKey: createIdempotencyKey('pin-unlock'),
       method: 'POST',
       retryAuth: false,
     }),

@@ -7,16 +7,36 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { Platform } from 'react-native';
 
-import { apiClient } from '@/lib/api';
+import { apiClient, createIdempotencyKey } from '@/lib/api';
 import { authApi, profileApi } from '@/lib/resident-api';
 import { credentialStore, getOrCreateDeviceId, membershipPreferenceStore } from '@/lib/storage';
 import type { AuthSessionPayload, Membership, OtpChallenge, ResidentProfile } from '@/types/api';
 
 type AuthStatus = 'authenticated' | 'booting' | 'recovery-error' | 'signed-out';
 
+function authDevice(fingerprint: string) {
+  return {
+    fingerprint,
+    platform:
+      Platform.OS === 'android'
+        ? ('ANDROID' as const)
+        : Platform.OS === 'ios'
+          ? ('IOS' as const)
+          : Platform.OS === 'web'
+            ? ('WEB' as const)
+            : ('UNKNOWN' as const),
+  };
+}
+
+function indianPhoneE164(phone: string): string {
+  return `+91${phone}`;
+}
+
 interface PendingOtp extends OtpChallenge {
   phone: string;
+  verificationIdempotencyKey: string;
 }
 
 interface AuthValue {
@@ -46,10 +66,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const commitSession = useCallback(async (session: AuthSessionPayload) => {
     await credentialStore.setRefreshToken(session.refreshToken);
     apiClient.setAccessToken(session.accessToken);
-    setProfile(session.profile);
+    const nextProfile = await profileApi.me();
+    setProfile(nextProfile);
 
     const remembered = await membershipPreferenceStore.get();
-    const approved = session.profile.memberships.filter(
+    const approved = nextProfile.memberships.filter(
       (membership) => membership.status === 'APPROVED',
     );
     const selection =
@@ -69,14 +90,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const refreshSession = useCallback(async () => {
-    const refreshToken = await credentialStore.getRefreshToken();
-    if (!refreshToken) {
+    const credentials = await credentialStore.getRefreshCredentials();
+    if (!credentials) {
       setStatus('signed-out');
       return;
     }
     const deviceId = await getOrCreateDeviceId();
     try {
-      const session = await authApi.refresh({ deviceId, refreshToken });
+      const session = await authApi.refresh(
+        { deviceFingerprint: deviceId, refreshToken: credentials.refreshToken },
+        credentials.refreshIdempotencyKey,
+      );
       await commitSession(session);
     } catch (error) {
       if (error instanceof Error && 'status' in error && error.status === 401) {
@@ -96,19 +120,29 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const requestOtp = useCallback(async (phone: string) => {
     const deviceId = await getOrCreateDeviceId();
-    const challenge = await authApi.requestOtp({ deviceId, phone });
-    setPendingOtp({ ...challenge, phone });
+    const normalizedPhone = indianPhoneE164(phone);
+    const challenge = await authApi.requestOtp({ deviceNonce: deviceId, phone: normalizedPhone });
+    setPendingOtp({
+      ...challenge,
+      phone: normalizedPhone,
+      verificationIdempotencyKey: createIdempotencyKey('otp-verify'),
+    });
   }, []);
 
   const verifyOtp = useCallback(
     async (code: string) => {
       if (!pendingOtp) throw new Error('Request a new verification code.');
       const deviceId = await getOrCreateDeviceId();
-      const session = await authApi.verifyOtp({
-        challengeId: pendingOtp.challengeId,
-        code,
-        deviceId,
-      });
+      const session = await authApi.verifyOtp(
+        {
+          challengeId: pendingOtp.challengeId,
+          code,
+          device: authDevice(deviceId),
+          deviceNonce: deviceId,
+          phone: pendingOtp.phone,
+        },
+        pendingOtp.verificationIdempotencyKey,
+      );
       await commitSession(session);
       setPendingOtp(null);
     },
@@ -118,7 +152,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const unlockPin = useCallback(
     async (phone: string, pin: string) => {
       const deviceId = await getOrCreateDeviceId();
-      await commitSession(await authApi.unlockPin({ deviceId, phone, pin }));
+      await commitSession(
+        await authApi.unlockPin({
+          device: authDevice(deviceId),
+          phone: indianPhoneE164(phone),
+          pin,
+        }),
+      );
     },
     [commitSession],
   );
@@ -142,9 +182,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
   );
 
   const logout = useCallback(async () => {
-    const refreshToken = await credentialStore.getRefreshToken();
+    const authenticated = Boolean(apiClient.getAccessToken());
     try {
-      if (refreshToken) await authApi.logout(refreshToken);
+      if (authenticated) await authApi.logout();
     } finally {
       await clearSession();
     }

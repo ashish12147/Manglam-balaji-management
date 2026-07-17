@@ -4,6 +4,7 @@ import { Text } from 'react-native';
 
 import { Button, PageHeader, QueryState, Row, Screen, Section } from '@/components/ui';
 import { errorMessage } from '@/lib/api';
+import { isSecureExternalUrl } from '@/lib/links';
 import { useApiQuery } from '@/lib/query';
 import { maintenanceApi } from '@/lib/resident-api';
 import { useConnectivity } from '@/providers/ConnectivityProvider';
@@ -14,6 +15,9 @@ export function PaymentScreen() {
   const start = useMutation({
     mutationFn: maintenanceApi.startOnlinePayment,
     onSuccess: async (data) => {
+      if (!isSecureExternalUrl(data.checkoutUrl)) {
+        throw new Error('The payment provider returned an unsafe checkout URL.');
+      }
       const available = await Linking.canOpenURL(data.checkoutUrl);
       if (!available)
         throw new Error('The verified payment URL could not be opened on this device.');

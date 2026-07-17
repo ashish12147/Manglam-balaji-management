@@ -1,3 +1,5 @@
+import * as Crypto from 'expo-crypto';
+
 import { getRuntimeConfig } from '@/lib/config';
 import { getOrCreateDeviceId } from '@/lib/storage';
 
@@ -97,12 +99,21 @@ class ApiClient {
     const config = getRuntimeConfig();
     const deviceId = await getOrCreateDeviceId();
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs ?? 15_000);
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, options.timeoutMs ?? 15_000);
+    const abortFromCaller = () => controller.abort();
+    if (options.signal?.aborted) controller.abort();
+    else options.signal?.addEventListener('abort', abortFromCaller, { once: true });
     const auth = options.auth ?? true;
     const headers: Record<string, string> = {
       Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'X-Device-Id': deviceId,
+      ...(options.body !== undefined && !(options.body instanceof FormData)
+        ? { 'Content-Type': 'application/json' }
+        : {}),
+      'X-Device-Fingerprint': deviceId,
       ...options.headers,
     };
 
@@ -119,7 +130,7 @@ class ApiClient {
               body: options.body instanceof FormData ? options.body : JSON.stringify(options.body),
             }
           : {}),
-        signal: options.signal ?? controller.signal,
+        signal: controller.signal,
       });
 
       const payload: unknown =
@@ -138,11 +149,14 @@ class ApiClient {
     } catch (error) {
       if (error instanceof ApiError) throw error;
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new NetworkError('The request timed out. Please try again.');
+        throw new NetworkError(
+          timedOut ? 'The request timed out. Please try again.' : 'The request was cancelled.',
+        );
       }
       throw new NetworkError();
     } finally {
       clearTimeout(timeoutId);
+      options.signal?.removeEventListener('abort', abortFromCaller);
     }
   }
 }
@@ -150,9 +164,7 @@ class ApiClient {
 export const apiClient = new ApiClient();
 
 export function createIdempotencyKey(scope: string): string {
-  const random =
-    globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `${scope}:${random}`;
+  return `${scope}:${Crypto.randomUUID()}`;
 }
 
 export function errorMessage(error: unknown): string {

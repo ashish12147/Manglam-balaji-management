@@ -235,7 +235,7 @@ export function MaintenanceScreen() {
             payments.data?.items.map((payment) => (
               <Row
                 detail={
-                  payment.method.replaceAll('_', ' ') + ' � ' + formatDateTime(payment.receivedAt)
+                  payment.method.replaceAll('_', ' ') + ' - ' + formatDateTime(payment.receivedAt)
                 }
                 key={payment.id}
                 title={formatCurrency(payment.amount, payment.currency)}

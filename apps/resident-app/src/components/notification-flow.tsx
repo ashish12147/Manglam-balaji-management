@@ -1,4 +1,3 @@
-import { Linking } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 
@@ -13,6 +12,7 @@ import {
   Section,
 } from '@/components/ui';
 import { useApiQuery } from '@/lib/query';
+import { isSafeInternalRoute } from '@/lib/links';
 import { notificationApi } from '@/lib/resident-api';
 import { useConnectivity } from '@/providers/ConnectivityProvider';
 import { formatDateTime } from '@/lib/format';
@@ -35,11 +35,10 @@ export function NotificationScreen() {
     isOffline: c.isResolved && !c.isOnline,
     onRetry: () => void notifications.refetch(),
   };
-  const open = async (id: string, link: string | null) => {
+  const open = (id: string, link: string | null) => {
     read.mutate(id);
     if (!link) return;
-    if (link.startsWith('/')) router.push(link as never);
-    else if (link.startsWith('https://')) await Linking.openURL(link);
+    if (isSafeInternalRoute(link)) router.push(link as never);
   };
   return (
     <Screen>
