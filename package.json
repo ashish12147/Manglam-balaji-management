@@ -1,0 +1,45 @@
+{
+  "name": "manglam-balaji-management",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Single-society resident, guard, and administration system for Manglam Balaji Society.",
+  "license": "MIT",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": ">=24.0.0 <25",
+    "pnpm": ">=11.0.0 <12"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "clean": "turbo run clean && rimraf .turbo coverage test-results playwright-report",
+    "db:generate": "pnpm --filter @manglam/database generate",
+    "db:migrate": "pnpm --filter @manglam/database migrate:dev",
+    "db:migrate:deploy": "pnpm --filter @manglam/database migrate:deploy",
+    "db:seed": "pnpm --filter @manglam/database seed",
+    "db:validate": "pnpm --filter @manglam/database validate",
+    "dev": "turbo run dev --parallel",
+    "dev:admin": "pnpm --filter @manglam/admin-web dev",
+    "dev:api": "pnpm --filter @manglam/api dev",
+    "dev:guard": "pnpm --filter @manglam/guard-app dev",
+    "dev:resident": "pnpm --filter @manglam/resident-app dev",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage",
+    "test:e2e": "turbo run test:e2e",
+    "test:integration": "turbo run test:integration",
+    "typecheck": "turbo run typecheck",
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@types/node": "24.10.1",
+    "eslint": "9.39.1",
+    "prettier": "3.7.4",
+    "rimraf": "6.1.2",
+    "turbo": "2.6.3",
+    "typescript": "5.9.3",
+    "vitest": "4.0.16"
+  }
+}
