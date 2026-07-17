@@ -1,0 +1,624 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  engineType   = "client"
+  runtime      = "nodejs"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum SessionKind {
+  RESIDENT
+  GUARD
+  PRIVILEGED
+}
+
+enum SessionStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+  COMPROMISED
+}
+
+enum OtpPurpose {
+  SIGN_IN
+  PHONE_CHANGE
+  PIN_RESET
+  STEP_UP
+}
+
+enum OtpChallengeStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  SUPERSEDED
+  LOCKED
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
+  UNKNOWN
+}
+
+enum DeviceStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+  LOST
+}
+
+enum PushProvider {
+  FCM
+  EXPO
+  WEB_PUSH
+  DEVELOPMENT
+}
+
+enum PushEndpointStatus {
+  ACTIVE
+  INVALID
+  REVOKED
+}
+
+enum RoleScope {
+  SOCIETY
+  FLAT
+  GATE
+}
+
+enum MembershipRelationship {
+  OWNER
+  TENANT
+  ADULT_FAMILY
+}
+
+enum OccupancyType {
+  OWNER_OCCUPIED
+  RENTED
+  FAMILY_OCCUPIED
+  OTHER
+}
+
+enum MembershipStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+  ENDED
+}
+
+enum FamilyRelationship {
+  CHILD
+  PARENT
+  SPOUSE
+  SIBLING
+  DEPENDENT
+  OTHER
+}
+
+enum GuardStatus {
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+}
+
+enum VisitorCategory {
+  GUEST
+  DELIVERY
+  CAB
+  SERVICE_PROVIDER
+  OTHER
+}
+
+enum VisitSource {
+  PRE_APPROVAL
+  WALK_IN
+  OFFLINE_MANUAL
+}
+
+enum VisitStatus {
+  DRAFT
+  EXPECTED
+  ARRIVED_AT_GATE
+  AWAITING_APPROVAL
+  APPROVED
+  REJECTED
+  APPROVAL_TIMED_OUT
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  EXPIRED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  TIMED_OUT
+  CANCELLED
+  OVERRIDDEN
+}
+
+enum ApprovalSource {
+  RESIDENT_APP
+  PRE_APPROVAL
+  GUARD_OVERRIDE
+  SYSTEM
+}
+
+enum VisitEventType {
+  CREATED
+  ARRIVED
+  APPROVAL_REQUESTED
+  APPROVED
+  REJECTED
+  APPROVAL_TIMED_OUT
+  OVERRIDDEN
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  EXPIRED
+  LONG_VISIT_FLAGGED
+  SYNC_CONFLICT
+}
+
+enum AccessType {
+  ONE_TIME
+  RECURRING
+}
+
+enum PreApprovalStatus {
+  ACTIVE
+  CONSUMED
+  CANCELLED
+  EXPIRED
+  SUSPENDED
+}
+
+enum DailyHelpType {
+  MAID
+  COOK
+  DRIVER
+  CLEANER
+  NANNY
+  DELIVERY_STAFF
+  REGULAR_SERVICE_PROVIDER
+  OTHER
+}
+
+enum DailyHelpStatus {
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  SUSPENDED
+  ENDED
+}
+
+enum AttendanceStatus {
+  CHECKED_IN
+  CHECKED_OUT
+  VOIDED
+}
+
+enum DailyHelpEventType {
+  CREATED
+  ACTIVATED
+  SUSPENDED
+  DEACTIVATED
+  ASSIGNED
+  ASSIGNMENT_ENDED
+  CHECKED_IN
+  CHECKED_OUT
+  ATTENDANCE_VOIDED
+}
+
+enum ParcelDecision {
+  ALLOW_ENTRY
+  REJECT
+  LEAVE_AT_GATE
+}
+
+enum ParcelStatus {
+  EXPECTED
+  ARRIVED
+  HELD_AT_GATE
+  COLLECTED
+  RETURNED
+  CANCELLED
+}
+
+enum ParcelEventType {
+  CREATED
+  ARRIVED
+  DECISION_RECORDED
+  HELD
+  COLLECTED
+  RETURNED
+  CANCELLED
+}
+
+enum NoticeCategory {
+  GENERAL
+  URGENT
+  MAINTENANCE
+  WATER
+  ELECTRICITY
+  MEETING
+  OTHER
+}
+
+enum NoticePriority {
+  NORMAL
+  IMPORTANT
+  URGENT
+}
+
+enum NoticeStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  EXPIRED
+  ARCHIVED
+}
+
+enum AudienceType {
+  ALL_RESIDENTS
+  ROLE
+  BLOCK
+  FLAT
+}
+
+enum ComplaintPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum ComplaintStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  REOPENED
+  CANCELLED
+}
+
+enum ChargeBatchStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+enum MaintenanceDueStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  WAIVED
+  CANCELLED
+}
+
+enum ChargeAdjustmentType {
+  LATE_FEE
+  DEBIT
+  CREDIT
+  WAIVER
+  CANCELLATION
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  BANK_TRANSFER
+  CHEQUE
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING_VERIFICATION
+  CONFIRMED
+  REVERSED
+  FAILED
+}
+
+enum ReceiptStatus {
+  ISSUED
+  VOIDED
+}
+
+enum ReceiptEventType {
+  ISSUED
+  VOIDED
+}
+
+enum EmergencyCategory {
+  MEDICAL
+  FIRE
+  SECURITY_THREAT
+  LIFT_EMERGENCY
+  OTHER
+}
+
+enum EmergencyStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESPONDING
+  RESOLVED
+  FALSE_ALARM
+}
+
+enum EmergencyEventType {
+  CREATED
+  GUARD_ACKNOWLEDGED
+  ADMIN_ACKNOWLEDGED
+  RESPONSE_STARTED
+  RESPONSE_UPDATED
+  RESOLVED
+  MARKED_FALSE_ALARM
+}
+
+enum NotificationCategory {
+  SECURITY_CRITICAL
+  VISITOR_APPROVAL
+  VISITOR_ACTIVITY
+  EMERGENCY
+  NOTICE
+  COMPLAINT
+  PAYMENT
+  GENERAL
+}
+
+enum NotificationChannel {
+  IN_APP
+  PUSH
+  SMS
+  EMAIL
+  REALTIME
+}
+
+enum DeliveryStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  RETRY
+  FAILED
+  CANCELLED
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PUBLISHED
+  RETRY
+  DEAD_LETTER
+}
+
+enum InboxStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum FileStatus {
+  PENDING_UPLOAD
+  UPLOADED
+  QUARANTINED
+  SCANNING
+  CLEAN
+  REJECTED
+  DELETED
+}
+
+enum FilePurpose {
+  PROFILE_PHOTO
+  VISITOR_PHOTO
+  DAILY_HELP_PHOTO
+  PARCEL_PHOTO
+  NOTICE_ATTACHMENT
+  COMPLAINT_ATTACHMENT
+  RECEIPT
+}
+
+enum AuditOutcome {
+  SUCCESS
+  DENIED
+  FAILURE
+}
+
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum OfflineSyncStatus {
+  LOCAL_PENDING
+  SYNCING
+  SYNCED
+  CONFLICT
+  FAILED
+}
+
+enum SyncAttemptResult {
+  ACCEPTED
+  DUPLICATE
+  CONFLICT
+  FAILED
+}
+
+model Society {
+  id                  String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  singletonKey        String                   @default("MANGLAM_BALAJI") @map("singleton_key") @db.VarChar(32)
+  name                String                   @db.VarChar(160)
+  legalName           String?                  @map("legal_name") @db.VarChar(200)
+  timezone            String                   @default("Asia/Kolkata") @db.VarChar(64)
+  currency            String                   @default("INR") @db.Char(3)
+  status              RecordStatus             @default(ACTIVE)
+  version             Int                      @default(1)
+  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  settings            SocietySettings?
+  blocks              Block[]
+  gates               Gate[]
+  users               User[]
+  otpChallenges       OtpChallenge[]
+  devices             Device[]
+  roles               Role[]
+  permissions         Permission[]
+  visitors            Visitor[]
+  dailyHelpProfiles   DailyHelp[]
+  complaintCategories ComplaintCategory[]
+  chargeBatches       MaintenanceChargeBatch[]
+  documentSequences   DocumentSequence[]
+  fileUploads         FileUpload[]
+  outboxEvents        OutboxEvent[]
+  inboxMessages       InboxMessage[]
+  auditLogs           AuditLog[]
+  idempotencyRecords  IdempotencyRecord[]
+
+  @@unique([singletonKey], map: "societies_singleton_key_key")
+  @@unique([id, singletonKey], map: "societies_id_singleton_key_key")
+  @@map("societies")
+}
+
+model SocietySettings {
+  id                            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId                     String   @unique(map: "society_settings_society_id_key") @map("society_id") @db.Uuid
+  visitorApprovalTimeoutSeconds Int      @default(120) @map("visitor_approval_timeout_seconds")
+  longVisitThresholdMinutes     Int      @default(720) @map("long_visit_threshold_minutes")
+  guardOfflineLeaseHours        Int      @default(24) @map("guard_offline_lease_hours")
+  visitorRetentionDays          Int      @default(180) @map("visitor_retention_days")
+  photoRetentionDays            Int      @default(30) @map("photo_retention_days")
+  notificationRetentionDays     Int      @default(90) @map("notification_retention_days")
+  auditRetentionDays            Int      @default(365) @map("audit_retention_days")
+  allowVisitorPhotos            Boolean  @default(true) @map("allow_visitor_photos")
+  emergencyContacts             Json?    @map("emergency_contacts") @db.JsonB
+  version                       Int      @default(1)
+  createdAt                     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society                       Society  @relation(fields: [societyId], references: [id], onDelete: Restrict)
+
+  @@map("society_settings")
+}
+
+model Block {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId       String           @map("society_id") @db.Uuid
+  code            String           @db.VarChar(32)
+  name            String           @db.VarChar(120)
+  sortOrder       Int              @default(0) @map("sort_order")
+  status          RecordStatus     @default(ACTIVE)
+  version         Int              @default(1)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society         Society          @relation(fields: [societyId], references: [id], onDelete: Restrict)
+  floors          Floor[]
+  flats           Flat[]
+  noticeAudiences NoticeAudience[]
+
+  @@unique([societyId, code], map: "blocks_society_id_code_key")
+  @@unique([societyId, id], map: "blocks_society_id_id_key")
+  @@index([societyId, status], map: "blocks_society_id_status_idx")
+  @@map("blocks")
+}
+
+model Floor {
+  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId String       @map("society_id") @db.Uuid
+  blockId   String       @map("block_id") @db.Uuid
+  label     String       @db.VarChar(32)
+  number    Int?
+  sortOrder Int          @default(0) @map("sort_order")
+  status    RecordStatus @default(ACTIVE)
+  version   Int          @default(1)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  block     Block        @relation(fields: [blockId], references: [id], onDelete: Restrict)
+  flats     Flat[]
+
+  @@unique([blockId, label], map: "floors_block_id_label_key")
+  @@unique([societyId, id], map: "floors_society_id_id_key")
+  @@unique([societyId, blockId, id], map: "floors_society_block_id_key")
+  @@index([blockId, sortOrder], map: "floors_block_id_sort_order_idx")
+  @@map("floors")
+}
+
+model Flat {
+  id                   String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId            String                    @map("society_id") @db.Uuid
+  blockId              String                    @map("block_id") @db.Uuid
+  floorId              String                    @map("floor_id") @db.Uuid
+  number               String                    @db.VarChar(32)
+  displayName          String                    @map("display_name") @db.VarChar(80)
+  occupancyType        OccupancyType?            @map("occupancy_type")
+  intercomNumber       String?                   @map("intercom_number") @db.VarChar(32)
+  status               RecordStatus              @default(ACTIVE)
+  version              Int                       @default(1)
+  createdAt            DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  block                Block                     @relation(fields: [blockId], references: [id], onDelete: Restrict)
+  floor                Floor                     @relation(fields: [floorId], references: [id], onDelete: Restrict)
+  memberships          FlatMembership[]
+  familyMembers        FamilyMember[]
+  preApprovals         VisitorPreApproval[]
+  visits               Visit[]
+  dailyHelpAssignments DailyHelpFlatAssignment[]
+  parcels              Parcel[]
+  noticeAudiences      NoticeAudience[]
+  complaints           Complaint[]
+  maintenanceCharges   MaintenanceCharge[]
+  payments             Payment[]
+  emergencies          EmergencyAlert[]
+
+  @@unique([blockId, number], map: "flats_block_id_number_key")
+  @@unique([societyId, id], map: "flats_society_id_id_key")
+  @@index([floorId, status], map: "flats_floor_id_status_idx")
+  @@index([societyId, displayName], map: "flats_society_id_display_name_idx")
+  @@map("flats")
+}
+
+model Gate {
+  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId            String                @map("society_id") @db.Uuid
+  code                 String                @db.VarChar(32)
+  name                 String                @db.VarChar(120)
+  status               RecordStatus          @default(ACTIVE)
+  version              Int                   @default(1)
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society              Society               @relation(fields: [societyId], references: [id], onDelete: Restrict)
+  deviceAssignments    GuardDeviceGate[]
+  guardAssignments     GuardGateAssignment[]
+  visits               Visit[]
+  dailyHelpAttendances DailyHelpAttendance[]
+  parcels              Parcel[]
+
+  @@unique([societyId, code], map: "gates_society_id_code_key")
+  @@unique([societyId, id], map: "gates_society_id_id_key")
+  @@index([societyId, status], map: "gates_society_id_status_idx")
+  @@map("gates")
+}

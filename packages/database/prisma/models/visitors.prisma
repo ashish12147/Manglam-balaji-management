@@ -1,0 +1,187 @@
+model Visitor {
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId       String               @map("society_id") @db.Uuid
+  name            String               @db.VarChar(120)
+  normalizedPhone String?              @map("normalized_phone") @db.VarChar(16)
+  phoneDigest     String?              @map("phone_digest") @db.Char(64)
+  vehicleNumber   String?              @map("vehicle_number") @db.VarChar(24)
+  photoFileId     String?              @map("photo_file_id") @db.Uuid
+  notes           String?              @db.VarChar(500)
+  createdByUserId String?              @map("created_by_user_id") @db.Uuid
+  lastVisitedAt   DateTime?            @map("last_visited_at") @db.Timestamptz(6)
+  version         Int                  @default(1)
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society         Society              @relation(fields: [societyId], references: [id], onDelete: Restrict)
+  photo           FileUpload?          @relation("VisitorPhoto", fields: [photoFileId], references: [id], onDelete: Restrict)
+  preApprovals    VisitorPreApproval[]
+  visits          Visit[]
+
+  @@unique([societyId, id], map: "visitors_society_id_id_key")
+  @@index([societyId, phoneDigest], map: "visitors_society_phone_digest_idx")
+  @@index([societyId, vehicleNumber], map: "visitors_society_vehicle_idx")
+  @@map("visitors")
+}
+
+model VisitorPreApproval {
+  id                    String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId             String            @map("society_id") @db.Uuid
+  flatId                String            @map("flat_id") @db.Uuid
+  visitorId             String            @map("visitor_id") @db.Uuid
+  createdByMembershipId String            @map("created_by_membership_id") @db.Uuid
+  createdByUserId       String            @map("created_by_user_id") @db.Uuid
+  category              VisitorCategory
+  purpose               String?           @db.VarChar(240)
+  expectedAt            DateTime          @map("expected_at") @db.Timestamptz(6)
+  validFrom             DateTime          @map("valid_from") @db.Timestamptz(6)
+  validUntil            DateTime          @map("valid_until") @db.Timestamptz(6)
+  accessType            AccessType        @default(ONE_TIME) @map("access_type")
+  status                PreApprovalStatus @default(ACTIVE)
+  codeDigest            String            @map("code_digest") @db.Char(64)
+  maxUses               Int               @default(1) @map("max_uses")
+  useCount              Int               @default(0) @map("use_count")
+  cancelledAt           DateTime?         @map("cancelled_at") @db.Timestamptz(6)
+  cancellationReason    String?           @map("cancellation_reason") @db.VarChar(500)
+  version               Int               @default(1)
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  flat                  Flat              @relation(fields: [flatId], references: [id], onDelete: Restrict)
+  visitor               Visitor           @relation(fields: [visitorId], references: [id], onDelete: Restrict)
+  createdByMembership   FlatMembership    @relation(fields: [createdByMembershipId], references: [id], onDelete: Restrict)
+  uses                  PreApprovalUse[]
+  visits                Visit[]
+
+  @@unique([societyId, codeDigest], map: "visitor_preapprovals_society_code_key")
+  @@unique([societyId, id], map: "visitor_preapprovals_society_id_id_key")
+  @@index([flatId, status, expectedAt(sort: Desc)], map: "visitor_preapprovals_flat_status_expected_idx")
+  @@index([visitorId, status], map: "visitor_preapprovals_visitor_status_idx")
+  @@map("visitor_pre_approvals")
+}
+
+model PreApprovalUse {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId         String             @map("society_id") @db.Uuid
+  preApprovalId     String             @map("pre_approval_id") @db.Uuid
+  visitId           String             @unique(map: "pre_approval_uses_visit_id_key") @map("visit_id") @db.Uuid
+  verifiedByGuardId String             @map("verified_by_guard_id") @db.Uuid
+  usedAt            DateTime           @default(now()) @map("used_at") @db.Timestamptz(6)
+  preApproval       VisitorPreApproval @relation(fields: [preApprovalId], references: [id], onDelete: Restrict)
+  visit             Visit              @relation(fields: [visitId], references: [id], onDelete: Restrict)
+
+  @@unique([societyId, id], map: "pre_approval_uses_society_id_id_key")
+  @@index([preApprovalId, usedAt(sort: Desc)], map: "pre_approval_uses_preapproval_used_idx")
+  @@map("pre_approval_uses")
+}
+
+model Visit {
+  id                      String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId               String              @map("society_id") @db.Uuid
+  flatId                  String              @map("flat_id") @db.Uuid
+  visitorId               String              @map("visitor_id") @db.Uuid
+  gateId                  String              @map("gate_id") @db.Uuid
+  preApprovalId           String?             @map("pre_approval_id") @db.Uuid
+  source                  VisitSource
+  category                VisitorCategory
+  status                  VisitStatus         @default(DRAFT)
+  visitorNameSnapshot     String              @map("visitor_name_snapshot") @db.VarChar(120)
+  visitorPhoneMasked      String?             @map("visitor_phone_masked") @db.VarChar(24)
+  vehicleNumberSnapshot   String?             @map("vehicle_number_snapshot") @db.VarChar(24)
+  purpose                 String?             @db.VarChar(240)
+  expectedAt              DateTime?           @map("expected_at") @db.Timestamptz(6)
+  arrivedAt               DateTime?           @map("arrived_at") @db.Timestamptz(6)
+  approvalDeadlineAt      DateTime?           @map("approval_deadline_at") @db.Timestamptz(6)
+  approvedAt              DateTime?           @map("approved_at") @db.Timestamptz(6)
+  checkedInAt             DateTime?           @map("checked_in_at") @db.Timestamptz(6)
+  checkedOutAt            DateTime?           @map("checked_out_at") @db.Timestamptz(6)
+  expiresAt               DateTime?           @map("expires_at") @db.Timestamptz(6)
+  longVisitFlaggedAt      DateTime?           @map("long_visit_flagged_at") @db.Timestamptz(6)
+  createdByUserId         String?             @map("created_by_user_id") @db.Uuid
+  createdByGuardProfileId String?             @map("created_by_guard_profile_id") @db.Uuid
+  createdByGuardDeviceId  String?             @map("created_by_guard_device_id") @db.Uuid
+  offlineCreated          Boolean             @default(false) @map("offline_created")
+  clientCreatedAt         DateTime?           @map("client_created_at") @db.Timestamptz(6)
+  version                 Int                 @default(1)
+  createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  flat                    Flat                @relation(fields: [flatId], references: [id], onDelete: Restrict)
+  visitor                 Visitor             @relation(fields: [visitorId], references: [id], onDelete: Restrict)
+  gate                    Gate                @relation(fields: [gateId], references: [id], onDelete: Restrict)
+  preApproval             VisitorPreApproval? @relation(fields: [preApprovalId], references: [id], onDelete: Restrict)
+  preApprovalUse          PreApprovalUse?
+  approvals               VisitApproval[]
+  events                  VisitEvent[]
+  parcels                 Parcel[]
+
+  @@unique([societyId, id], map: "visits_society_id_id_key")
+  @@index([flatId, status, createdAt(sort: Desc)], map: "visits_flat_status_created_idx")
+  @@index([gateId, status, arrivedAt(sort: Desc)], map: "visits_gate_status_arrived_idx")
+  @@index([status, expectedAt], map: "visits_status_expected_idx")
+  @@index([visitorId, createdAt(sort: Desc)], map: "visits_visitor_created_idx")
+  @@map("visits")
+}
+
+model VisitApproval {
+  id                        String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId                 String                 @map("society_id") @db.Uuid
+  visitId                   String                 @map("visit_id") @db.Uuid
+  status                    ApprovalStatus         @default(PENDING)
+  requestedByGuardProfileId String                 @map("requested_by_guard_profile_id") @db.Uuid
+  requestedByGuardDeviceId  String                 @map("requested_by_guard_device_id") @db.Uuid
+  requestedAt               DateTime               @default(now()) @map("requested_at") @db.Timestamptz(6)
+  expiresAt                 DateTime               @map("expires_at") @db.Timestamptz(6)
+  decidedAt                 DateTime?              @map("decided_at") @db.Timestamptz(6)
+  version                   Int                    @default(1)
+  createdAt                 DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  visit                     Visit                  @relation(fields: [visitId], references: [id], onDelete: Restrict)
+  decision                  VisitApprovalDecision?
+
+  @@unique([societyId, id], map: "visit_approvals_society_id_id_key")
+  @@index([visitId, status, requestedAt(sort: Desc)], map: "visit_approvals_visit_status_requested_idx")
+  @@index([status, expiresAt], map: "visit_approvals_status_expires_idx")
+  @@map("visit_approvals")
+}
+
+model VisitApprovalDecision {
+  id                   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId            String         @map("society_id") @db.Uuid
+  approvalId           String         @unique(map: "visit_approval_decisions_approval_id_key") @map("approval_id") @db.Uuid
+  decision             ApprovalStatus
+  source               ApprovalSource
+  actorUserId          String?        @map("actor_user_id") @db.Uuid
+  actorGuardProfileId  String?        @map("actor_guard_profile_id") @db.Uuid
+  reason               String?        @db.VarChar(500)
+  actorAuthenticatedAt DateTime?      @map("actor_authenticated_at") @db.Timestamptz(6)
+  correlationId        String         @map("correlation_id") @db.Uuid
+  occurredAt           DateTime       @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  approval             VisitApproval  @relation(fields: [approvalId], references: [id], onDelete: Restrict)
+
+  @@unique([societyId, id], map: "visit_approval_decisions_society_id_id_key")
+  @@index([actorUserId, occurredAt(sort: Desc)], map: "visit_decisions_actor_user_occurred_idx")
+  @@map("visit_approval_decisions")
+}
+
+model VisitEvent {
+  id                  String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId           String         @map("society_id") @db.Uuid
+  visitId             String         @map("visit_id") @db.Uuid
+  sequence            Int
+  eventType           VisitEventType @map("event_type")
+  previousStatus      VisitStatus?   @map("previous_status")
+  newStatus           VisitStatus?   @map("new_status")
+  actorUserId         String?        @map("actor_user_id") @db.Uuid
+  actorGuardProfileId String?        @map("actor_guard_profile_id") @db.Uuid
+  actorGuardDeviceId  String?        @map("actor_guard_device_id") @db.Uuid
+  gateId              String?        @map("gate_id") @db.Uuid
+  serverOccurredAt    DateTime       @default(now()) @map("server_occurred_at") @db.Timestamptz(6)
+  clientOccurredAt    DateTime?      @map("client_occurred_at") @db.Timestamptz(6)
+  correlationId       String         @map("correlation_id") @db.Uuid
+  metadata            Json?          @db.JsonB
+  visit               Visit          @relation(fields: [visitId], references: [id], onDelete: Restrict)
+
+  @@unique([visitId, sequence], map: "visit_events_visit_sequence_key")
+  @@unique([societyId, id], map: "visit_events_society_id_id_key")
+  @@index([visitId, serverOccurredAt], map: "visit_events_visit_occurred_idx")
+  @@index([eventType, serverOccurredAt(sort: Desc)], map: "visit_events_type_occurred_idx")
+  @@map("visit_events")
+}

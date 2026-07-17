@@ -1,0 +1,280 @@
+model NotificationPreference {
+  id         String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId  String               @map("society_id") @db.Uuid
+  userId     String               @map("user_id") @db.Uuid
+  category   NotificationCategory
+  channel    NotificationChannel
+  enabled    Boolean              @default(true)
+  quietStart Int?                 @map("quiet_start")
+  quietEnd   Int?                 @map("quiet_end")
+  version    Int                  @default(1)
+  createdAt  DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, category, channel], map: "notification_preferences_user_category_channel_key")
+  @@unique([societyId, id], map: "notification_preferences_society_id_id_key")
+  @@index([userId, enabled], map: "notification_preferences_user_enabled_idx")
+  @@map("notification_preferences")
+}
+
+model Notification {
+  id              String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId       String                 @map("society_id") @db.Uuid
+  recipientUserId String                 @map("recipient_user_id") @db.Uuid
+  category        NotificationCategory
+  title           String                 @db.VarChar(200)
+  body            String                 @db.Text
+  entityType      String?                @map("entity_type") @db.VarChar(80)
+  entityId        String?                @map("entity_id") @db.Uuid
+  deepLink        String?                @map("deep_link") @db.VarChar(500)
+  dedupeKey       String                 @map("dedupe_key") @db.VarChar(200)
+  readAt          DateTime?              @map("read_at") @db.Timestamptz(6)
+  expiresAt       DateTime?              @map("expires_at") @db.Timestamptz(6)
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  recipient       User                   @relation(fields: [recipientUserId], references: [id], onDelete: Restrict)
+  deliveries      NotificationDelivery[]
+
+  @@unique([recipientUserId, dedupeKey], map: "notifications_recipient_dedupe_key")
+  @@unique([societyId, id], map: "notifications_society_id_id_key")
+  @@index([recipientUserId, readAt, createdAt(sort: Desc)], map: "notifications_recipient_read_created_idx")
+  @@index([category, createdAt(sort: Desc)], map: "notifications_category_created_idx")
+  @@map("notifications")
+}
+
+model NotificationDelivery {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId         String              @map("society_id") @db.Uuid
+  notificationId    String              @map("notification_id") @db.Uuid
+  pushEndpointId    String?             @map("push_endpoint_id") @db.Uuid
+  channel           NotificationChannel
+  status            DeliveryStatus      @default(PENDING)
+  attemptCount      Int                 @default(0) @map("attempt_count")
+  nextAttemptAt     DateTime?           @map("next_attempt_at") @db.Timestamptz(6)
+  providerMessageId String?             @map("provider_message_id") @db.VarChar(200)
+  deliveredAt       DateTime?           @map("delivered_at") @db.Timestamptz(6)
+  failedAt          DateTime?           @map("failed_at") @db.Timestamptz(6)
+  errorCode         String?             @map("error_code") @db.VarChar(80)
+  errorDetail       String?             @map("error_detail") @db.VarChar(500)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  notification      Notification        @relation(fields: [notificationId], references: [id], onDelete: Restrict)
+  pushEndpoint      PushEndpoint?       @relation(fields: [pushEndpointId], references: [id], onDelete: Restrict)
+
+  @@unique([notificationId, channel, pushEndpointId], map: "notification_deliveries_notification_channel_endpoint_key")
+  @@unique([societyId, id], map: "notification_deliveries_society_id_id_key")
+  @@index([status, nextAttemptAt], map: "notification_deliveries_status_next_attempt_idx")
+  @@index([notificationId], map: "notification_deliveries_notification_id_idx")
+  @@map("notification_deliveries")
+}
+
+model OutboxEvent {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId     String          @map("society_id") @db.Uuid
+  aggregateType String          @map("aggregate_type") @db.VarChar(80)
+  aggregateId   String          @map("aggregate_id") @db.Uuid
+  eventType     String          @map("event_type") @db.VarChar(120)
+  payload       Json            @db.JsonB
+  status        OutboxStatus    @default(PENDING)
+  dedupeKey     String          @map("dedupe_key") @db.VarChar(200)
+  availableAt   DateTime        @default(now()) @map("available_at") @db.Timestamptz(6)
+  claimedAt     DateTime?       @map("claimed_at") @db.Timestamptz(6)
+  publishedAt   DateTime?       @map("published_at") @db.Timestamptz(6)
+  attemptCount  Int             @default(0) @map("attempt_count")
+  lastErrorCode String?         @map("last_error_code") @db.VarChar(80)
+  correlationId String          @map("correlation_id") @db.Uuid
+  traceId       String?         @map("trace_id") @db.VarChar(64)
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society       Society         @relation(fields: [societyId], references: [id], onDelete: Restrict)
+  attempts      OutboxAttempt[]
+
+  @@unique([societyId, dedupeKey], map: "outbox_events_society_dedupe_key")
+  @@unique([societyId, id], map: "outbox_events_society_id_id_key")
+  @@index([status, availableAt], map: "outbox_events_status_available_idx")
+  @@index([aggregateType, aggregateId, createdAt], map: "outbox_events_aggregate_created_idx")
+  @@map("outbox_events")
+}
+
+model OutboxAttempt {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId     String       @map("society_id") @db.Uuid
+  outboxEventId String       @map("outbox_event_id") @db.Uuid
+  attempt       Int
+  status        OutboxStatus
+  errorCode     String?      @map("error_code") @db.VarChar(80)
+  errorDetail   String?      @map("error_detail") @db.VarChar(500)
+  occurredAt    DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  outboxEvent   OutboxEvent  @relation(fields: [outboxEventId], references: [id], onDelete: Restrict)
+
+  @@unique([outboxEventId, attempt], map: "outbox_attempts_event_attempt_key")
+  @@unique([societyId, id], map: "outbox_attempts_society_id_id_key")
+  @@map("outbox_attempts")
+}
+
+model InboxMessage {
+  id                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId         String      @map("society_id") @db.Uuid
+  source            String      @db.VarChar(80)
+  externalMessageId String      @map("external_message_id") @db.VarChar(200)
+  messageType       String      @map("message_type") @db.VarChar(120)
+  payload           Json        @db.JsonB
+  status            InboxStatus @default(RECEIVED)
+  attemptCount      Int         @default(0) @map("attempt_count")
+  processedAt       DateTime?   @map("processed_at") @db.Timestamptz(6)
+  errorCode         String?     @map("error_code") @db.VarChar(80)
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society           Society     @relation(fields: [societyId], references: [id], onDelete: Restrict)
+
+  @@unique([source, externalMessageId], map: "inbox_messages_source_external_key")
+  @@unique([societyId, id], map: "inbox_messages_society_id_id_key")
+  @@index([status, createdAt], map: "inbox_messages_status_created_idx")
+  @@map("inbox_messages")
+}
+
+model FileUpload {
+  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId            String                @map("society_id") @db.Uuid
+  purpose              FilePurpose
+  status               FileStatus            @default(PENDING_UPLOAD)
+  bucket               String                @db.VarChar(120)
+  storageKey           String                @map("storage_key") @db.VarChar(500)
+  originalFilename     String                @map("original_filename") @db.VarChar(255)
+  declaredMimeType     String                @map("declared_mime_type") @db.VarChar(120)
+  detectedMimeType     String?               @map("detected_mime_type") @db.VarChar(120)
+  byteSize             BigInt                @map("byte_size")
+  sha256Digest         String?               @map("sha256_digest") @db.Char(64)
+  uploadedByUserId     String                @map("uploaded_by_user_id") @db.Uuid
+  parentEntityType     String                @map("parent_entity_type") @db.VarChar(80)
+  parentEntityId       String                @map("parent_entity_id") @db.Uuid
+  scanProvider         String?               @map("scan_provider") @db.VarChar(80)
+  scanCompletedAt      DateTime?             @map("scan_completed_at") @db.Timestamptz(6)
+  rejectionReason      String?               @map("rejection_reason") @db.VarChar(500)
+  uploadedAt           DateTime?             @map("uploaded_at") @db.Timestamptz(6)
+  retentionUntil       DateTime?             @map("retention_until") @db.Timestamptz(6)
+  version              Int                   @default(1)
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society              Society               @relation(fields: [societyId], references: [id], onDelete: Restrict)
+  visitorPhotos        Visitor[]             @relation("VisitorPhoto")
+  dailyHelpPhotos      DailyHelp[]           @relation("DailyHelpPhoto")
+  parcelPhotos         Parcel[]              @relation("ParcelPhoto")
+  noticeAttachments    NoticeAttachment[]
+  complaintAttachments ComplaintAttachment[]
+  receiptFiles         Receipt[]             @relation("ReceiptFile")
+
+  @@unique([bucket, storageKey], map: "file_uploads_bucket_storage_key")
+  @@unique([societyId, id], map: "file_uploads_society_id_id_key")
+  @@index([parentEntityType, parentEntityId], map: "file_uploads_parent_idx")
+  @@index([status, createdAt], map: "file_uploads_status_created_idx")
+  @@index([retentionUntil], map: "file_uploads_retention_until_idx")
+  @@map("file_uploads")
+}
+
+model AuditLog {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId      String       @map("society_id") @db.Uuid
+  actorUserId    String?      @map("actor_user_id") @db.Uuid
+  sessionId      String?      @map("session_id") @db.Uuid
+  deviceId       String?      @map("device_id") @db.Uuid
+  gateId         String?      @map("gate_id") @db.Uuid
+  action         String       @db.VarChar(120)
+  entityType     String       @map("entity_type") @db.VarChar(80)
+  entityId       String?      @map("entity_id") @db.Uuid
+  outcome        AuditOutcome @default(SUCCESS)
+  previousValues Json?        @map("previous_values") @db.JsonB
+  newValues      Json?        @map("new_values") @db.JsonB
+  reason         String?      @db.VarChar(500)
+  ipAddress      String?      @map("ip_address") @db.Inet
+  correlationId  String       @map("correlation_id") @db.Uuid
+  previousHash   String?      @map("previous_hash") @db.Char(64)
+  entryHash      String       @map("entry_hash") @db.Char(64)
+  metadata       Json?        @db.JsonB
+  occurredAt     DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  society        Society      @relation(fields: [societyId], references: [id], onDelete: Restrict)
+
+  @@unique([societyId, id], map: "audit_logs_society_id_id_key")
+  @@index([societyId, occurredAt(sort: Desc)], map: "audit_logs_society_occurred_idx")
+  @@index([entityType, entityId, occurredAt], map: "audit_logs_entity_occurred_idx")
+  @@index([actorUserId, occurredAt(sort: Desc)], map: "audit_logs_actor_occurred_idx")
+  @@index([correlationId], map: "audit_logs_correlation_id_idx")
+  @@map("audit_logs")
+}
+
+model IdempotencyRecord {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId      String            @map("society_id") @db.Uuid
+  actorScopeKey  String            @map("actor_scope_key") @db.VarChar(200)
+  actorUserId    String?           @map("actor_user_id") @db.Uuid
+  sessionId      String?           @map("session_id") @db.Uuid
+  guardDeviceId  String?           @map("guard_device_id") @db.Uuid
+  operation      String            @db.VarChar(120)
+  key            String            @db.VarChar(200)
+  requestHash    String            @map("request_hash") @db.Char(64)
+  status         IdempotencyStatus @default(IN_PROGRESS)
+  responseStatus Int?              @map("response_status")
+  responseBody   Json?             @map("response_body") @db.JsonB
+  lockedUntil    DateTime?         @map("locked_until") @db.Timestamptz(6)
+  expiresAt      DateTime          @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society        Society           @relation(fields: [societyId], references: [id], onDelete: Restrict)
+
+  @@unique([societyId, actorScopeKey, operation, key], map: "idempotency_records_actor_operation_key")
+  @@unique([societyId, id], map: "idempotency_records_society_id_id_key")
+  @@index([status, lockedUntil], map: "idempotency_records_status_locked_idx")
+  @@index([expiresAt], map: "idempotency_records_expires_at_idx")
+  @@map("idempotency_records")
+}
+
+model OfflineSyncRecord {
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId        String               @map("society_id") @db.Uuid
+  guardDeviceId    String               @map("guard_device_id") @db.Uuid
+  clientMutationId String               @map("client_mutation_id") @db.Uuid
+  clientSequence   BigInt               @map("client_sequence")
+  operation        String               @db.VarChar(120)
+  entityType       String               @map("entity_type") @db.VarChar(80)
+  entityId         String               @map("entity_id") @db.Uuid
+  payloadHash      String               @map("payload_hash") @db.Char(64)
+  signature        String               @db.Text
+  status           OfflineSyncStatus    @default(LOCAL_PENDING)
+  localCreatedAt   DateTime             @map("local_created_at") @db.Timestamptz(6)
+  lastServerSeenAt DateTime?            @map("last_server_seen_at") @db.Timestamptz(6)
+  serverReceivedAt DateTime             @default(now()) @map("server_received_at") @db.Timestamptz(6)
+  syncedAt         DateTime?            @map("synced_at") @db.Timestamptz(6)
+  conflictCode     String?              @map("conflict_code") @db.VarChar(80)
+  conflictDetails  Json?                @map("conflict_details") @db.JsonB
+  retryCount       Int                  @default(0) @map("retry_count")
+  version          Int                  @default(1)
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  guardDevice      GuardDevice          @relation(fields: [guardDeviceId], references: [id], onDelete: Restrict)
+  attempts         OfflineSyncAttempt[]
+
+  @@unique([guardDeviceId, clientMutationId], map: "offline_sync_device_mutation_key")
+  @@unique([guardDeviceId, clientSequence], map: "offline_sync_device_sequence_key")
+  @@unique([societyId, id], map: "offline_sync_records_society_id_id_key")
+  @@index([guardDeviceId, status, localCreatedAt], map: "offline_sync_device_status_created_idx")
+  @@index([status, serverReceivedAt], map: "offline_sync_status_received_idx")
+  @@map("offline_sync_records")
+}
+
+model OfflineSyncAttempt {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId     String            @map("society_id") @db.Uuid
+  syncRecordId  String            @map("sync_record_id") @db.Uuid
+  attempt       Int
+  result        SyncAttemptResult
+  errorCode     String?           @map("error_code") @db.VarChar(80)
+  errorDetail   String?           @map("error_detail") @db.VarChar(500)
+  correlationId String            @map("correlation_id") @db.Uuid
+  occurredAt    DateTime          @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  syncRecord    OfflineSyncRecord @relation(fields: [syncRecordId], references: [id], onDelete: Restrict)
+
+  @@unique([syncRecordId, attempt], map: "offline_sync_attempts_record_attempt_key")
+  @@unique([societyId, id], map: "offline_sync_attempts_society_id_id_key")
+  @@index([syncRecordId, occurredAt], map: "offline_sync_attempts_record_occurred_idx")
+  @@map("offline_sync_attempts")
+}

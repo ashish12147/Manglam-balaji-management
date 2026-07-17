@@ -1,0 +1,245 @@
+model User {
+  id                    String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId             String                   @map("society_id") @db.Uuid
+  normalizedPhone       String                   @map("normalized_phone") @db.VarChar(16)
+  phoneDigest           String                   @map("phone_digest") @db.Char(64)
+  email                 String?                  @db.VarChar(254)
+  displayName           String                   @map("display_name") @db.VarChar(120)
+  status                UserStatus               @default(PENDING)
+  preferredLocale       String                   @default("en-IN") @map("preferred_locale") @db.VarChar(16)
+  passwordHash          String?                  @map("password_hash") @db.VarChar(255)
+  appPinHash            String?                  @map("app_pin_hash") @db.VarChar(255)
+  mfaEnabled            Boolean                  @default(false) @map("mfa_enabled")
+  lastAuthenticatedAt   DateTime?                @map("last_authenticated_at") @db.Timestamptz(6)
+  deactivatedAt         DateTime?                @map("deactivated_at") @db.Timestamptz(6)
+  deactivationReason    String?                  @map("deactivation_reason") @db.VarChar(500)
+  version               Int                      @default(1)
+  createdAt             DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society               Society                  @relation(fields: [societyId], references: [id], onDelete: Restrict)
+  sessions              UserSession[]
+  devices               Device[]
+  pushEndpoints         PushEndpoint[]
+  roleAssignments       UserRole[]
+  memberships           FlatMembership[]
+  guardProfile          GuardProfile?
+  noticeRecipients      NoticeRecipient[]
+  noticeReads           NoticeRead[]
+  noticeAcknowledgments NoticeAcknowledgement[]
+  notificationPrefs     NotificationPreference[]
+  notifications         Notification[]
+
+  @@unique([societyId, normalizedPhone], map: "users_society_id_phone_key")
+  @@unique([societyId, id], map: "users_society_id_id_key")
+  @@index([societyId, status], map: "users_society_id_status_idx")
+  @@index([phoneDigest], map: "users_phone_digest_idx")
+  @@map("users")
+}
+
+model OtpChallenge {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId         String             @map("society_id") @db.Uuid
+  userId            String?            @map("user_id") @db.Uuid
+  normalizedPhone   String             @map("normalized_phone") @db.VarChar(16)
+  phoneDigest       String             @map("phone_digest") @db.Char(64)
+  purpose           OtpPurpose
+  status            OtpChallengeStatus @default(PENDING)
+  codeDigest        String             @map("code_digest") @db.Char(64)
+  deviceNonceDigest String             @map("device_nonce_digest") @db.Char(64)
+  attemptCount      Int                @default(0) @map("attempt_count")
+  maxAttempts       Int                @default(5) @map("max_attempts")
+  expiresAt         DateTime           @map("expires_at") @db.Timestamptz(6)
+  verifiedAt        DateTime?          @map("verified_at") @db.Timestamptz(6)
+  supersededAt      DateTime?          @map("superseded_at") @db.Timestamptz(6)
+  requestIpHash     String?            @map("request_ip_hash") @db.Char(64)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society           Society            @relation(fields: [societyId], references: [id], onDelete: Restrict)
+
+  @@unique([societyId, id], map: "otp_challenges_society_id_id_key")
+  @@index([phoneDigest, purpose, createdAt(sort: Desc)], map: "otp_challenges_phone_purpose_created_idx")
+  @@index([status, expiresAt], map: "otp_challenges_status_expires_idx")
+  @@map("otp_challenges")
+}
+
+model Device {
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId         String         @map("society_id") @db.Uuid
+  userId            String?        @map("user_id") @db.Uuid
+  platform          DevicePlatform @default(UNKNOWN)
+  status            DeviceStatus   @default(PENDING)
+  label             String?        @db.VarChar(120)
+  fingerprintDigest String         @map("fingerprint_digest") @db.Char(64)
+  publicKey         String?        @map("public_key") @db.Text
+  appVersion        String?        @map("app_version") @db.VarChar(32)
+  operatingSystem   String?        @map("operating_system") @db.VarChar(80)
+  lastSeenAt        DateTime?      @map("last_seen_at") @db.Timestamptz(6)
+  revokedAt         DateTime?      @map("revoked_at") @db.Timestamptz(6)
+  revocationReason  String?        @map("revocation_reason") @db.VarChar(500)
+  version           Int            @default(1)
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society           Society        @relation(fields: [societyId], references: [id], onDelete: Restrict)
+  user              User?          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  sessions          UserSession[]
+  pushEndpoints     PushEndpoint[]
+  guardDevice       GuardDevice?
+
+  @@unique([societyId, fingerprintDigest], map: "devices_society_id_fingerprint_key")
+  @@unique([societyId, id], map: "devices_society_id_id_key")
+  @@index([userId, status], map: "devices_user_id_status_idx")
+  @@map("devices")
+}
+
+model UserSession {
+  id                   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId            String         @map("society_id") @db.Uuid
+  userId               String         @map("user_id") @db.Uuid
+  deviceId             String?        @map("device_id") @db.Uuid
+  kind                 SessionKind
+  status               SessionStatus  @default(ACTIVE)
+  refreshTokenFamilyId String         @map("refresh_token_family_id") @db.Uuid
+  lastSeenAt           DateTime       @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  idleExpiresAt        DateTime       @map("idle_expires_at") @db.Timestamptz(6)
+  absoluteExpiresAt    DateTime       @map("absolute_expires_at") @db.Timestamptz(6)
+  revokedAt            DateTime?      @map("revoked_at") @db.Timestamptz(6)
+  revocationReason     String?        @map("revocation_reason") @db.VarChar(500)
+  ipAddress            String?        @map("ip_address") @db.Inet
+  userAgentHash        String?        @map("user_agent_hash") @db.Char(64)
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                 User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  device               Device?        @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  refreshTokens        RefreshToken[] @relation("SessionTokens")
+
+  @@unique([societyId, id], map: "user_sessions_society_id_id_key")
+  @@index([userId, status, absoluteExpiresAt], map: "user_sessions_user_status_expires_idx")
+  @@index([refreshTokenFamilyId], map: "user_sessions_token_family_idx")
+  @@map("user_sessions")
+}
+
+model RefreshToken {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId     String         @map("society_id") @db.Uuid
+  sessionId     String         @map("session_id") @db.Uuid
+  familyId      String         @map("family_id") @db.Uuid
+  tokenDigest   String         @unique(map: "refresh_tokens_token_digest_key") @map("token_digest") @db.Char(64)
+  parentTokenId String?        @map("parent_token_id") @db.Uuid
+  status        SessionStatus  @default(ACTIVE)
+  issuedAt      DateTime       @default(now()) @map("issued_at") @db.Timestamptz(6)
+  expiresAt     DateTime       @map("expires_at") @db.Timestamptz(6)
+  consumedAt    DateTime?      @map("consumed_at") @db.Timestamptz(6)
+  revokedAt     DateTime?      @map("revoked_at") @db.Timestamptz(6)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  session       UserSession    @relation("SessionTokens", fields: [sessionId], references: [id], onDelete: Restrict)
+  parentToken   RefreshToken?  @relation("RefreshTokenRotation", fields: [parentTokenId], references: [id], onDelete: Restrict)
+  rotatedTokens RefreshToken[] @relation("RefreshTokenRotation")
+
+  @@unique([societyId, id], map: "refresh_tokens_society_id_id_key")
+  @@index([sessionId, status], map: "refresh_tokens_session_id_status_idx")
+  @@index([familyId, status], map: "refresh_tokens_family_id_status_idx")
+  @@map("refresh_tokens")
+}
+
+model PushEndpoint {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId            String                 @map("society_id") @db.Uuid
+  userId               String                 @map("user_id") @db.Uuid
+  deviceId             String?                @map("device_id") @db.Uuid
+  provider             PushProvider
+  status               PushEndpointStatus     @default(ACTIVE)
+  tokenDigest          String                 @map("token_digest") @db.Char(64)
+  encryptedToken       String                 @map("encrypted_token") @db.Text
+  lastDeliveredAt      DateTime?              @map("last_delivered_at") @db.Timestamptz(6)
+  lastFailureAt        DateTime?              @map("last_failure_at") @db.Timestamptz(6)
+  lastFailureCode      String?                @map("last_failure_code") @db.VarChar(80)
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                 User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  device               Device?                @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  notificationAttempts NotificationDelivery[]
+
+  @@unique([societyId, tokenDigest], map: "push_endpoints_society_id_token_key")
+  @@unique([societyId, id], map: "push_endpoints_society_id_id_key")
+  @@index([userId, status], map: "push_endpoints_user_id_status_idx")
+  @@map("push_endpoints")
+}
+
+model Role {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId       String           @map("society_id") @db.Uuid
+  code            String           @db.VarChar(80)
+  name            String           @db.VarChar(120)
+  description     String?          @db.VarChar(500)
+  privilegeLevel  Int              @default(0) @map("privilege_level")
+  isSystem        Boolean          @default(false) @map("is_system")
+  status          RecordStatus     @default(ACTIVE)
+  version         Int              @default(1)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society         Society          @relation(fields: [societyId], references: [id], onDelete: Restrict)
+  permissionLinks RolePermission[]
+  userAssignments UserRole[]
+  noticeAudiences NoticeAudience[]
+
+  @@unique([societyId, code], map: "roles_society_id_code_key")
+  @@unique([societyId, id], map: "roles_society_id_id_key")
+  @@index([societyId, status], map: "roles_society_id_status_idx")
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId   String           @map("society_id") @db.Uuid
+  action      String           @db.VarChar(120)
+  description String?          @db.VarChar(500)
+  riskLevel   Int              @default(0) @map("risk_level")
+  status      RecordStatus     @default(ACTIVE)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society     Society          @relation(fields: [societyId], references: [id], onDelete: Restrict)
+  roleLinks   RolePermission[]
+
+  @@unique([societyId, action], map: "permissions_society_id_action_key")
+  @@unique([societyId, id], map: "permissions_society_id_id_key")
+  @@map("permissions")
+}
+
+model RolePermission {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId       String     @map("society_id") @db.Uuid
+  roleId          String     @map("role_id") @db.Uuid
+  permissionId    String     @map("permission_id") @db.Uuid
+  grantedByUserId String?    @map("granted_by_user_id") @db.Uuid
+  grantedAt       DateTime   @default(now()) @map("granted_at") @db.Timestamptz(6)
+  role            Role       @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  permission      Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+
+  @@unique([roleId, permissionId], map: "role_permissions_role_permission_key")
+  @@unique([societyId, id], map: "role_permissions_society_id_id_key")
+  @@index([permissionId], map: "role_permissions_permission_id_idx")
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId        String    @map("society_id") @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  roleId           String    @map("role_id") @db.Uuid
+  scope            RoleScope @default(SOCIETY)
+  flatMembershipId String?   @map("flat_membership_id") @db.Uuid
+  gateId           String?   @map("gate_id") @db.Uuid
+  grantedByUserId  String?   @map("granted_by_user_id") @db.Uuid
+  startsAt         DateTime  @default(now()) @map("starts_at") @db.Timestamptz(6)
+  expiresAt        DateTime? @map("expires_at") @db.Timestamptz(6)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revocationReason String?   @map("revocation_reason") @db.VarChar(500)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  role             Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([societyId, id], map: "user_roles_society_id_id_key")
+  @@index([userId, revokedAt, expiresAt], map: "user_roles_user_active_idx")
+  @@index([roleId], map: "user_roles_role_id_idx")
+  @@map("user_roles")
+}

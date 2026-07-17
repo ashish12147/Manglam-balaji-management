@@ -1,0 +1,159 @@
+model FlatMembership {
+  id                   String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId            String                    @map("society_id") @db.Uuid
+  userId               String                    @map("user_id") @db.Uuid
+  flatId               String                    @map("flat_id") @db.Uuid
+  relationship         MembershipRelationship
+  occupancyType        OccupancyType             @map("occupancy_type")
+  status               MembershipStatus          @default(PENDING)
+  startAt              DateTime                  @map("start_at") @db.Timestamptz(6)
+  endAt                DateTime?                 @map("end_at") @db.Timestamptz(6)
+  requestedAt          DateTime                  @default(now()) @map("requested_at") @db.Timestamptz(6)
+  approvedByUserId     String?                   @map("approved_by_user_id") @db.Uuid
+  approvedAt           DateTime?                 @map("approved_at") @db.Timestamptz(6)
+  rejectedAt           DateTime?                 @map("rejected_at") @db.Timestamptz(6)
+  rejectionReason      String?                   @map("rejection_reason") @db.VarChar(500)
+  suspendedAt          DateTime?                 @map("suspended_at") @db.Timestamptz(6)
+  suspensionReason     String?                   @map("suspension_reason") @db.VarChar(500)
+  endedAt              DateTime?                 @map("ended_at") @db.Timestamptz(6)
+  endReason            String?                   @map("end_reason") @db.VarChar(500)
+  version              Int                       @default(1)
+  createdAt            DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                 User                      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  flat                 Flat                      @relation(fields: [flatId], references: [id], onDelete: Restrict)
+  history              FlatMembershipHistory[]
+  familyMembers        FamilyMember[]
+  visitorPreApprovals  VisitorPreApproval[]
+  dailyHelpAssignments DailyHelpFlatAssignment[]
+
+  @@unique([societyId, id], map: "flat_memberships_society_id_id_key")
+  @@index([userId, status], map: "flat_memberships_user_id_status_idx")
+  @@index([flatId, status, startAt, endAt], map: "flat_memberships_flat_status_dates_idx")
+  @@map("flat_memberships")
+}
+
+model FlatMembershipHistory {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId     String            @map("society_id") @db.Uuid
+  membershipId  String            @map("membership_id") @db.Uuid
+  sequence      Int
+  fromStatus    MembershipStatus? @map("from_status")
+  toStatus      MembershipStatus  @map("to_status")
+  actorUserId   String?           @map("actor_user_id") @db.Uuid
+  reason        String?           @db.VarChar(500)
+  metadata      Json?             @db.JsonB
+  correlationId String            @map("correlation_id") @db.Uuid
+  occurredAt    DateTime          @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  membership    FlatMembership    @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+
+  @@unique([membershipId, sequence], map: "membership_history_membership_sequence_key")
+  @@unique([societyId, id], map: "membership_history_society_id_id_key")
+  @@index([membershipId, occurredAt(sort: Desc)], map: "membership_history_membership_occurred_idx")
+  @@map("flat_membership_history")
+}
+
+model FamilyMember {
+  id                    String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId             String             @map("society_id") @db.Uuid
+  flatId                String             @map("flat_id") @db.Uuid
+  managedByMembershipId String             @map("managed_by_membership_id") @db.Uuid
+  name                  String             @db.VarChar(120)
+  relationship          FamilyRelationship
+  dateOfBirth           DateTime?          @map("date_of_birth") @db.Date
+  normalizedPhone       String?            @map("normalized_phone") @db.VarChar(16)
+  notes                 String?            @db.VarChar(500)
+  status                RecordStatus       @default(ACTIVE)
+  startAt               DateTime           @default(now()) @map("start_at") @db.Timestamptz(6)
+  endAt                 DateTime?          @map("end_at") @db.Timestamptz(6)
+  version               Int                @default(1)
+  createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  flat                  Flat               @relation(fields: [flatId], references: [id], onDelete: Restrict)
+  managedByMembership   FlatMembership     @relation(fields: [managedByMembershipId], references: [id], onDelete: Restrict)
+
+  @@unique([societyId, id], map: "family_members_society_id_id_key")
+  @@index([flatId, status], map: "family_members_flat_id_status_idx")
+  @@map("family_members")
+}
+
+model GuardProfile {
+  id                 String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId          String                @map("society_id") @db.Uuid
+  userId             String                @unique(map: "guard_profiles_user_id_key") @map("user_id") @db.Uuid
+  employeeCode       String                @map("employee_code") @db.VarChar(40)
+  pinHash            String                @map("pin_hash") @db.VarChar(255)
+  status             GuardStatus           @default(ACTIVE)
+  preferredLocale    String                @default("hi-IN") @map("preferred_locale") @db.VarChar(16)
+  lastShiftStartedAt DateTime?             @map("last_shift_started_at") @db.Timestamptz(6)
+  version            Int                   @default(1)
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user               User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  gateAssignments    GuardGateAssignment[]
+
+  @@unique([societyId, employeeCode], map: "guard_profiles_society_employee_key")
+  @@unique([societyId, id], map: "guard_profiles_society_id_id_key")
+  @@index([societyId, status], map: "guard_profiles_society_status_idx")
+  @@map("guard_profiles")
+}
+
+model GuardDevice {
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId             String              @map("society_id") @db.Uuid
+  deviceId              String              @unique(map: "guard_devices_device_id_key") @map("device_id") @db.Uuid
+  enrollmentTokenDigest String?             @map("enrollment_token_digest") @db.Char(64)
+  enrollmentExpiresAt   DateTime?           @map("enrollment_expires_at") @db.Timestamptz(6)
+  keyId                 String?             @map("key_id") @db.VarChar(120)
+  offlineLeaseExpiresAt DateTime?           @map("offline_lease_expires_at") @db.Timestamptz(6)
+  lastSyncedAt          DateTime?           @map("last_synced_at") @db.Timestamptz(6)
+  lastAcceptedSequence  BigInt              @default(0) @map("last_accepted_sequence")
+  registeredByUserId    String?             @map("registered_by_user_id") @db.Uuid
+  status                DeviceStatus        @default(PENDING)
+  version               Int                 @default(1)
+  createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  device                Device              @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  gateAssignments       GuardDeviceGate[]
+  offlineRecords        OfflineSyncRecord[]
+
+  @@unique([societyId, id], map: "guard_devices_society_id_id_key")
+  @@index([societyId, status], map: "guard_devices_society_status_idx")
+  @@map("guard_devices")
+}
+
+model GuardDeviceGate {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId     String       @map("society_id") @db.Uuid
+  guardDeviceId String       @map("guard_device_id") @db.Uuid
+  gateId        String       @map("gate_id") @db.Uuid
+  startsAt      DateTime     @default(now()) @map("starts_at") @db.Timestamptz(6)
+  endsAt        DateTime?    @map("ends_at") @db.Timestamptz(6)
+  status        RecordStatus @default(ACTIVE)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  guardDevice   GuardDevice  @relation(fields: [guardDeviceId], references: [id], onDelete: Restrict)
+  gate          Gate         @relation(fields: [gateId], references: [id], onDelete: Restrict)
+
+  @@unique([societyId, id], map: "guard_device_gates_society_id_id_key")
+  @@index([guardDeviceId, status], map: "guard_device_gates_device_status_idx")
+  @@index([gateId, status], map: "guard_device_gates_gate_status_idx")
+  @@map("guard_device_gates")
+}
+
+model GuardGateAssignment {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId      String       @map("society_id") @db.Uuid
+  guardProfileId String       @map("guard_profile_id") @db.Uuid
+  gateId         String       @map("gate_id") @db.Uuid
+  startsAt       DateTime     @default(now()) @map("starts_at") @db.Timestamptz(6)
+  endsAt         DateTime?    @map("ends_at") @db.Timestamptz(6)
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  guardProfile   GuardProfile @relation(fields: [guardProfileId], references: [id], onDelete: Restrict)
+  gate           Gate         @relation(fields: [gateId], references: [id], onDelete: Restrict)
+
+  @@unique([societyId, id], map: "guard_gate_assignments_society_id_id_key")
+  @@index([guardProfileId, status], map: "guard_gate_assignments_guard_status_idx")
+  @@index([gateId, status], map: "guard_gate_assignments_gate_status_idx")
+  @@map("guard_gate_assignments")
+}

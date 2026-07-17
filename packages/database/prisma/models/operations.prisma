@@ -1,0 +1,178 @@
+model DailyHelp {
+  id                      String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId               String                    @map("society_id") @db.Uuid
+  name                    String                    @db.VarChar(120)
+  normalizedPhone         String?                   @map("normalized_phone") @db.VarChar(16)
+  phoneDigest             String?                   @map("phone_digest") @db.Char(64)
+  photoFileId             String?                   @map("photo_file_id") @db.Uuid
+  type                    DailyHelpType
+  identificationReference String?                   @map("identification_reference") @db.VarChar(120)
+  status                  DailyHelpStatus           @default(ACTIVE)
+  notes                   String?                   @db.VarChar(500)
+  emergencyContactName    String?                   @map("emergency_contact_name") @db.VarChar(120)
+  emergencyContactPhone   String?                   @map("emergency_contact_phone") @db.VarChar(16)
+  activatedAt             DateTime?                 @map("activated_at") @db.Timestamptz(6)
+  suspendedAt             DateTime?                 @map("suspended_at") @db.Timestamptz(6)
+  suspensionReason        String?                   @map("suspension_reason") @db.VarChar(500)
+  version                 Int                       @default(1)
+  createdAt               DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society                 Society                   @relation(fields: [societyId], references: [id], onDelete: Restrict)
+  photo                   FileUpload?               @relation("DailyHelpPhoto", fields: [photoFileId], references: [id], onDelete: Restrict)
+  flatAssignments         DailyHelpFlatAssignment[]
+  attendances             DailyHelpAttendance[]
+  events                  DailyHelpEvent[]
+
+  @@unique([societyId, id], map: "daily_help_society_id_id_key")
+  @@index([societyId, status, type], map: "daily_help_society_status_type_idx")
+  @@index([societyId, phoneDigest], map: "daily_help_society_phone_idx")
+  @@map("daily_help")
+}
+
+model DailyHelpFlatAssignment {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId             String                  @map("society_id") @db.Uuid
+  dailyHelpId           String                  @map("daily_help_id") @db.Uuid
+  flatId                String                  @map("flat_id") @db.Uuid
+  managedByMembershipId String                  @map("managed_by_membership_id") @db.Uuid
+  status                AssignmentStatus        @default(ACTIVE)
+  startsAt              DateTime                @default(now()) @map("starts_at") @db.Timestamptz(6)
+  endsAt                DateTime?               @map("ends_at") @db.Timestamptz(6)
+  notes                 String?                 @db.VarChar(500)
+  version               Int                     @default(1)
+  createdAt             DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  dailyHelp             DailyHelp               @relation(fields: [dailyHelpId], references: [id], onDelete: Restrict)
+  flat                  Flat                    @relation(fields: [flatId], references: [id], onDelete: Restrict)
+  managedByMembership   FlatMembership          @relation(fields: [managedByMembershipId], references: [id], onDelete: Restrict)
+  accessWindows         DailyHelpAccessWindow[]
+  events                DailyHelpEvent[]
+
+  @@unique([societyId, id], map: "daily_help_assignments_society_id_id_key")
+  @@index([flatId, status], map: "daily_help_assignments_flat_status_idx")
+  @@index([dailyHelpId, status], map: "daily_help_assignments_helper_status_idx")
+  @@map("daily_help_flat_assignments")
+}
+
+model DailyHelpAccessWindow {
+  id           String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId    String                  @map("society_id") @db.Uuid
+  assignmentId String                  @map("assignment_id") @db.Uuid
+  weekday      Int
+  startMinute  Int                     @map("start_minute")
+  endMinute    Int                     @map("end_minute")
+  createdAt    DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  assignment   DailyHelpFlatAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+
+  @@unique([assignmentId, weekday, startMinute, endMinute], map: "daily_help_windows_assignment_time_key")
+  @@unique([societyId, id], map: "daily_help_windows_society_id_id_key")
+  @@index([assignmentId, weekday], map: "daily_help_windows_assignment_weekday_idx")
+  @@map("daily_help_access_windows")
+}
+
+model DailyHelpAttendance {
+  id                       String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId                String           @map("society_id") @db.Uuid
+  dailyHelpId              String           @map("daily_help_id") @db.Uuid
+  gateId                   String           @map("gate_id") @db.Uuid
+  status                   AttendanceStatus @default(CHECKED_IN)
+  checkedInAt              DateTime         @map("checked_in_at") @db.Timestamptz(6)
+  checkedOutAt             DateTime?        @map("checked_out_at") @db.Timestamptz(6)
+  checkedInByGuardId       String           @map("checked_in_by_guard_id") @db.Uuid
+  checkedOutByGuardId      String?          @map("checked_out_by_guard_id") @db.Uuid
+  checkInClientMutationId  String?          @map("check_in_client_mutation_id") @db.Uuid
+  checkOutClientMutationId String?          @map("check_out_client_mutation_id") @db.Uuid
+  voidedAt                 DateTime?        @map("voided_at") @db.Timestamptz(6)
+  voidReason               String?          @map("void_reason") @db.VarChar(500)
+  version                  Int              @default(1)
+  createdAt                DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  dailyHelp                DailyHelp        @relation(fields: [dailyHelpId], references: [id], onDelete: Restrict)
+  gate                     Gate             @relation(fields: [gateId], references: [id], onDelete: Restrict)
+  events                   DailyHelpEvent[]
+
+  @@unique([societyId, id], map: "daily_help_attendance_society_id_id_key")
+  @@index([dailyHelpId, checkedInAt(sort: Desc)], map: "daily_help_attendance_helper_checked_in_idx")
+  @@index([gateId, status, checkedInAt(sort: Desc)], map: "daily_help_attendance_gate_status_idx")
+  @@map("daily_help_attendance")
+}
+
+model DailyHelpEvent {
+  id                  String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId           String                   @map("society_id") @db.Uuid
+  dailyHelpId         String                   @map("daily_help_id") @db.Uuid
+  assignmentId        String?                  @map("assignment_id") @db.Uuid
+  attendanceId        String?                  @map("attendance_id") @db.Uuid
+  sequence            Int
+  eventType           DailyHelpEventType       @map("event_type")
+  actorUserId         String?                  @map("actor_user_id") @db.Uuid
+  actorGuardProfileId String?                  @map("actor_guard_profile_id") @db.Uuid
+  serverOccurredAt    DateTime                 @default(now()) @map("server_occurred_at") @db.Timestamptz(6)
+  clientOccurredAt    DateTime?                @map("client_occurred_at") @db.Timestamptz(6)
+  correlationId       String                   @map("correlation_id") @db.Uuid
+  metadata            Json?                    @db.JsonB
+  dailyHelp           DailyHelp                @relation(fields: [dailyHelpId], references: [id], onDelete: Restrict)
+  assignment          DailyHelpFlatAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  attendance          DailyHelpAttendance?     @relation(fields: [attendanceId], references: [id], onDelete: Restrict)
+
+  @@unique([dailyHelpId, sequence], map: "daily_help_events_helper_sequence_key")
+  @@unique([societyId, id], map: "daily_help_events_society_id_id_key")
+  @@index([dailyHelpId, serverOccurredAt], map: "daily_help_events_helper_occurred_idx")
+  @@map("daily_help_events")
+}
+
+model Parcel {
+  id                        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId                 String          @map("society_id") @db.Uuid
+  flatId                    String          @map("flat_id") @db.Uuid
+  gateId                    String          @map("gate_id") @db.Uuid
+  deliveryVisitId           String?         @map("delivery_visit_id") @db.Uuid
+  status                    ParcelStatus    @default(EXPECTED)
+  residentDecision          ParcelDecision? @map("resident_decision")
+  carrierName               String?         @map("carrier_name") @db.VarChar(120)
+  trackingReference         String?         @map("tracking_reference") @db.VarChar(120)
+  photoFileId               String?         @map("photo_file_id") @db.Uuid
+  collectionCodeDigest      String?         @unique(map: "parcels_collection_code_digest_key") @map("collection_code_digest") @db.Char(64)
+  collectionCodeExpiresAt   DateTime?       @map("collection_code_expires_at") @db.Timestamptz(6)
+  recordedByGuardProfileId  String          @map("recorded_by_guard_profile_id") @db.Uuid
+  arrivedAt                 DateTime?       @map("arrived_at") @db.Timestamptz(6)
+  heldAt                    DateTime?       @map("held_at") @db.Timestamptz(6)
+  collectedAt               DateTime?       @map("collected_at") @db.Timestamptz(6)
+  collectedByGuardProfileId String?         @map("collected_by_guard_profile_id") @db.Uuid
+  returnedAt                DateTime?       @map("returned_at") @db.Timestamptz(6)
+  version                   Int             @default(1)
+  createdAt                 DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  flat                      Flat            @relation(fields: [flatId], references: [id], onDelete: Restrict)
+  gate                      Gate            @relation(fields: [gateId], references: [id], onDelete: Restrict)
+  deliveryVisit             Visit?          @relation(fields: [deliveryVisitId], references: [id], onDelete: Restrict)
+  photo                     FileUpload?     @relation("ParcelPhoto", fields: [photoFileId], references: [id], onDelete: Restrict)
+  events                    ParcelEvent[]
+
+  @@unique([societyId, id], map: "parcels_society_id_id_key")
+  @@index([flatId, status, createdAt(sort: Desc)], map: "parcels_flat_status_created_idx")
+  @@index([gateId, status], map: "parcels_gate_status_idx")
+  @@map("parcels")
+}
+
+model ParcelEvent {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId           String          @map("society_id") @db.Uuid
+  parcelId            String          @map("parcel_id") @db.Uuid
+  sequence            Int
+  eventType           ParcelEventType @map("event_type")
+  previousStatus      ParcelStatus?   @map("previous_status")
+  newStatus           ParcelStatus?   @map("new_status")
+  actorUserId         String?         @map("actor_user_id") @db.Uuid
+  actorGuardProfileId String?         @map("actor_guard_profile_id") @db.Uuid
+  serverOccurredAt    DateTime        @default(now()) @map("server_occurred_at") @db.Timestamptz(6)
+  clientOccurredAt    DateTime?       @map("client_occurred_at") @db.Timestamptz(6)
+  correlationId       String          @map("correlation_id") @db.Uuid
+  metadata            Json?           @db.JsonB
+  parcel              Parcel          @relation(fields: [parcelId], references: [id], onDelete: Restrict)
+
+  @@unique([parcelId, sequence], map: "parcel_events_parcel_sequence_key")
+  @@unique([societyId, id], map: "parcel_events_society_id_id_key")
+  @@index([parcelId, serverOccurredAt], map: "parcel_events_parcel_occurred_idx")
+  @@map("parcel_events")
+}
