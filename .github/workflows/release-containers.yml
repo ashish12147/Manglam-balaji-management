@@ -19,6 +19,14 @@ jobs:
         target: [api, worker, admin-web, migration]
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - name: Require a semantic-version release tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: >-
+          echo "$RELEASE_TAG" | grep -Eq
+          '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'
       - name: Require production admin API URL
         if: matrix.target == 'admin-web'
         env:
@@ -74,9 +82,17 @@ jobs:
       - name: Publish scanned image tags
         env:
           IMAGE_TAGS: ${{ steps.metadata.outputs.tags }}
+          SCANNED_IMAGE: manglam-${{ matrix.target }}:release-candidate
         run: |
+          set -euo pipefail
+          scanned_image_id="$(docker image inspect --format '{{.Id}}' "$SCANNED_IMAGE")"
           while IFS= read -r image_tag; do
             if [ -n "$image_tag" ]; then
+              image_id="$(docker image inspect --format '{{.Id}}' "$image_tag")"
+              if [ "$image_id" != "$scanned_image_id" ]; then
+                echo "Refusing to push $image_tag because it differs from $SCANNED_IMAGE" >&2
+                exit 1
+              fi
               docker push "$image_tag"
             fi
           done <<< "$IMAGE_TAGS"

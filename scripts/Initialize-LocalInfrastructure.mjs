@@ -34,6 +34,8 @@ const values = {
   RESIDENT_APP_PIN_PEPPER: secret(),
   COOKIE_SECRET: secret(),
   ENCRYPTION_KEY: secret(),
+  MFA_ENCRYPTION_KEY_BASE64: randomBytes(32).toString('base64'),
+  MFA_ENCRYPTION_KEY_VERSION: '1',
   OTP_HMAC_SECRET: secret(),
   REFRESH_TOKEN_PEPPER: secret(),
   VISITOR_CODE_HMAC_SECRET: secret(),

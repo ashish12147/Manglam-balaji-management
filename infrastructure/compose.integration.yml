@@ -7,14 +7,16 @@ x-service-security: &service-security
 
 x-app-environment: &app-environment
   APP_ENV: development
-  DATABASE_URL: postgresql://${POSTGRES_USER:-manglam}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-manglam}?schema=public
-  REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+  DATABASE_URL:
+    postgresql://${POSTGRES_USER:-manglam}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is
+    required}@postgres:5432/${POSTGRES_DB:-manglam}?schema=public
+  REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
   REDIS_PREFIX: manglam:local
   S3_ENDPOINT: http://minio:9000
   S3_REGION: ${S3_REGION:-ap-south-1}
   S3_BUCKET: ${S3_BUCKET:-manglam-private}
-  S3_ACCESS_KEY_ID: ${MINIO_APP_ACCESS_KEY}
-  S3_SECRET_ACCESS_KEY: ${MINIO_APP_SECRET_KEY}
+  S3_ACCESS_KEY_ID: ${MINIO_APP_ACCESS_KEY:?MINIO_APP_ACCESS_KEY is required}
+  S3_SECRET_ACCESS_KEY: ${MINIO_APP_SECRET_KEY:?MINIO_APP_SECRET_KEY is required}
   S3_FORCE_PATH_STYLE: 'true'
 
 services:
@@ -24,7 +26,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-manglam}
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=scram-sha-256
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_USER: ${POSTGRES_USER:-manglam}
     command:
       [
@@ -66,12 +68,12 @@ services:
         '--appendfsync',
         'everysec',
         '--requirepass',
-        '${REDIS_PASSWORD}',
+        '${REDIS_PASSWORD:?REDIS_PASSWORD is required}',
         '--maxmemory-policy',
         'noeviction',
       ]
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     healthcheck:
       test: ['CMD-SHELL', "redis-cli -a '$${REDIS_PASSWORD}' --no-auth-warning ping | grep -q PONG"]
       interval: 5s
@@ -91,10 +93,10 @@ services:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address :9001
     environment:
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
     healthcheck:
-      test: ['CMD', 'curl', '--fail', 'http://127.0.0.1:9000/minio/health/live']
+      test: ['CMD', 'curl', '--fail', 'http://127.0.0.1:9000/minio/health/ready']
       interval: 5s
       timeout: 5s
       retries: 12
@@ -115,10 +117,10 @@ services:
     depends_on:
       minio: { condition: service_healthy }
     environment:
-      MINIO_APP_ACCESS_KEY: ${MINIO_APP_ACCESS_KEY}
-      MINIO_APP_SECRET_KEY: ${MINIO_APP_SECRET_KEY}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_APP_ACCESS_KEY: ${MINIO_APP_ACCESS_KEY:?MINIO_APP_ACCESS_KEY is required}
+      MINIO_APP_SECRET_KEY: ${MINIO_APP_SECRET_KEY:?MINIO_APP_SECRET_KEY is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
       S3_BUCKET: ${S3_BUCKET:-manglam-private}
     entrypoint: ['/bin/sh', '/bootstrap/bootstrap-minio.sh']
     read_only: true
@@ -155,7 +157,9 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-manglam}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-manglam}?schema=public
+      DATABASE_URL:
+        postgresql://${POSTGRES_USER:-manglam}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is
+        required}@postgres:5432/${POSTGRES_DB:-manglam}?schema=public
     networks: [backend]
     security_opt: ['no-new-privileges:true']
 
@@ -182,18 +186,21 @@ services:
       WS_ORIGINS: http://127.0.0.1:3000
       TRUST_PROXY: 'false'
       API_DOCS_ENABLED: 'false'
-      ADMIN_PASSWORD_PEPPER: ${ADMIN_PASSWORD_PEPPER}
-      GUARD_PIN_PEPPER: ${GUARD_PIN_PEPPER}
-      RESIDENT_APP_PIN_PEPPER: ${RESIDENT_APP_PIN_PEPPER}
-      COOKIE_SECRET: ${COOKIE_SECRET}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      ADMIN_PASSWORD_PEPPER: ${ADMIN_PASSWORD_PEPPER:?ADMIN_PASSWORD_PEPPER is required}
+      GUARD_PIN_PEPPER: ${GUARD_PIN_PEPPER:?GUARD_PIN_PEPPER is required}
+      RESIDENT_APP_PIN_PEPPER: ${RESIDENT_APP_PIN_PEPPER:?RESIDENT_APP_PIN_PEPPER is required}
+      COOKIE_SECRET: ${COOKIE_SECRET:?COOKIE_SECRET is required}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      MFA_ENCRYPTION_KEY_BASE64: ${MFA_ENCRYPTION_KEY_BASE64:?MFA_ENCRYPTION_KEY_BASE64 is required}
+      MFA_ENCRYPTION_KEY_VERSION:
+        ${MFA_ENCRYPTION_KEY_VERSION:?MFA_ENCRYPTION_KEY_VERSION is required}
       JWT_AUDIENCE: manglam-clients
       JWT_ISSUER: manglam-local-api
-      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
-      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
-      OTP_HMAC_SECRET: ${OTP_HMAC_SECRET}
-      REFRESH_TOKEN_PEPPER: ${REFRESH_TOKEN_PEPPER}
-      VISITOR_CODE_HMAC_SECRET: ${VISITOR_CODE_HMAC_SECRET}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?JWT_PRIVATE_KEY is required}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?JWT_PUBLIC_KEY is required}
+      OTP_HMAC_SECRET: ${OTP_HMAC_SECRET:?OTP_HMAC_SECRET is required}
+      REFRESH_TOKEN_PEPPER: ${REFRESH_TOKEN_PEPPER:?REFRESH_TOKEN_PEPPER is required}
+      VISITOR_CODE_HMAC_SECRET: ${VISITOR_CODE_HMAC_SECRET:?VISITOR_CODE_HMAC_SECRET is required}
       OTP_PROVIDER: ${OTP_PROVIDER}
       MSG91_AUTH_KEY: ${MSG91_AUTH_KEY:-}
       MSG91_TEMPLATE_ID: ${MSG91_TEMPLATE_ID:-}
@@ -207,6 +214,18 @@ services:
       FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
     ports:
       - 127.0.0.1:${API_PORT:-4000}:4000
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4000/api/v1/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
     networks: [backend, edge]
     read_only: true
     tmpfs:
@@ -228,7 +247,7 @@ services:
       WORKER_ID: local-worker-1
       WORKER_HEALTH_PORT: 4010
       CLAMAV_HOST: clamav
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
       CLAMAV_PORT: 3310
       OTP_PROVIDER: ${OTP_PROVIDER}
       PUSH_PROVIDERS: ${PUSH_PROVIDER}
