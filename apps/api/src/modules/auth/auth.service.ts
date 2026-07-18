@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
-import { HttpStatus, Inject, Injectable, Optional } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  GuardStatus,
+  AuditOutcome,
   OtpChallengeStatus,
   OtpPurpose as DatabaseOtpPurpose,
   OutboxStatus,
@@ -30,17 +30,20 @@ import { MutationJournalService } from '../platform/mutation-journal.service.js'
 import { OTP_DELIVER_EVENT } from '../platform/outbox-contracts.js';
 import type { MutationRequestContext } from '../platform/request-context.js';
 import { SensitivePayloadCipher } from '../platform/sensitive-payload-cipher.js';
-import { PasswordHasher } from '../security/password-hasher.js';
 import { SecretDigestService } from '../security/secret-digest.service.js';
 import { digestMatches } from '../security/secrets.js';
 import type {
   AdminSignInInput,
-  AuthDeviceInput,
   GuardSignInInput,
   OtpRequestInput,
   OtpVerifyInput,
 } from './auth.schemas.js';
-import { MFA_VERIFIER, type MfaVerifier } from './mfa-verifier.js';
+import { AdminAuthService } from './admin-auth.service.js';
+import {
+  CredentialAttemptService,
+  type CredentialAttemptKeys,
+} from './credential-attempt.service.js';
+import { GuardAuthService } from './guard-auth.service.js';
 import { SessionService, type SessionTokenResponse } from './session.service.js';
 
 export interface OtpRequestResponse {
@@ -80,13 +83,12 @@ export class AuthService {
     private readonly digests: SecretDigestService,
     private readonly journal: MutationJournalService,
     private readonly payloadCipher: SensitivePayloadCipher,
-    private readonly passwordHasher: PasswordHasher,
     private readonly sessions: SessionService,
+    private readonly adminAuth: AdminAuthService,
+    private readonly attempts: CredentialAttemptService,
+    private readonly guardAuth: GuardAuthService,
     @Inject(OTP_DELIVERY_PROVIDER)
     private readonly otpDelivery: OtpDeliveryProvider,
-    @Optional()
-    @Inject(MFA_VERIFIER)
-    private readonly mfaVerifier: MfaVerifier | undefined,
   ) {
     this.otpMaxAttempts = config.get('OTP_MAX_ATTEMPTS', { infer: true });
     this.otpPepper = config.get('OTP_HMAC_SECRET', { infer: true });
@@ -272,6 +274,13 @@ export class AuthService {
       actorScopeKey: `otp-verify:${phoneDigest}:${input.challengeId}`.slice(0, 200),
     };
 
+    const attemptKeys = this.attempts.keys({
+      deviceFingerprint: input.device.fingerprint,
+      identifier: input.phone,
+      ipAddress: context.ipAddress,
+      method: 'OTP',
+      societyId: society.id,
+    });
     const outcome = await this.database.client.$transaction(
       async (transaction) => {
         const claim = await this.journal.begin<StoredOutcome<SessionTokenResponse>>(transaction, {
@@ -292,6 +301,24 @@ export class AuthService {
           return claim.response;
         }
 
+        const attemptsAllowed = await this.attempts.allowed(transaction, {
+          ...attemptKeys,
+          method: 'OTP',
+          societyId: society.id,
+        });
+        if (!attemptsAllowed) {
+          return this.commitOtpAttemptFailure(transaction, {
+            actor,
+            attemptKeys,
+            attemptOutcome: 'BLOCKED',
+            claimId: claim.recordId,
+            challengeId: input.challengeId,
+            code: 'AUTHENTICATION_RATE_LIMITED',
+            context,
+            societyId: society.id,
+            status: HttpStatus.TOO_MANY_REQUESTS,
+          });
+        }
         const challenge = await transaction.otpChallenge.findFirst({
           where: {
             id: input.challengeId,
@@ -311,12 +338,30 @@ export class AuthService {
           },
         });
         if (!challenge || latest?.id !== challenge.id) {
-          throw otpFailure('OTP_SUPERSEDED', 'A newer OTP challenge has replaced this one.');
+          return this.commitOtpAttemptFailure(transaction, {
+            actor,
+            attemptKeys,
+            attemptOutcome: 'FAILURE',
+            claimId: claim.recordId,
+            challengeId: input.challengeId,
+            code: 'OTP_SUPERSEDED',
+            context,
+            societyId: society.id,
+          });
         }
 
         const nonceDigest = this.digests.deviceNonce(input.deviceNonce, society.id);
         if (!digestMatches(nonceDigest, challenge.deviceNonceDigest)) {
-          throw otpFailure('OTP_INVALID', 'The OTP is invalid.');
+          return this.commitOtpAttemptFailure(transaction, {
+            actor,
+            attemptKeys,
+            attemptOutcome: 'FAILURE',
+            claimId: claim.recordId,
+            challengeId: input.challengeId,
+            code: 'OTP_INVALID',
+            context,
+            societyId: society.id,
+          });
         }
 
         const decision = verifyOtpChallenge({
@@ -369,6 +414,13 @@ export class AuthService {
             },
             ok: false,
           };
+          await this.attempts.record(transaction, {
+            ...attemptKeys,
+            failureCode: decision.error.code,
+            method: 'OTP',
+            outcome: 'FAILURE',
+            societyId: society.id,
+          });
           await this.journal.commit(transaction, {
             action: 'auth.otp.verify_failed',
             actor: { ...actor, userId: challenge.userId },
@@ -415,7 +467,7 @@ export class AuthService {
           user?.roleAssignments.some((assignment) =>
             ['SOCIETY_ADMIN', 'SUPER_ADMIN'].includes(assignment.role.code),
           ) ?? false;
-        if (!user || isAdministrator) {
+        if (!user || isAdministrator || user.guardProfile) {
           await transaction.otpChallenge.update({
             data: {
               attemptCount: decision.challenge.attempts,
@@ -433,6 +485,13 @@ export class AuthService {
             },
             ok: false,
           };
+          await this.attempts.record(transaction, {
+            ...attemptKeys,
+            failureCode: 'AUTHENTICATION_REQUIRED',
+            method: 'OTP',
+            outcome: 'FAILURE',
+            societyId: society.id,
+          });
           await this.journal.commit(transaction, {
             action: 'auth.otp.verify_denied',
             actor: { ...actor, userId: user?.id ?? null },
@@ -462,7 +521,7 @@ export class AuthService {
         const tokens = await this.sessions.createWithinTransaction(transaction, {
           context,
           device: input.device,
-          kind: user.guardProfile ? 'GUARD' : 'RESIDENT',
+          kind: 'RESIDENT',
           societyId: society.id,
           userId: user.id,
         });
@@ -470,6 +529,12 @@ export class AuthService {
           data: tokens,
           ok: true,
         };
+        await this.attempts.record(transaction, {
+          ...attemptKeys,
+          method: 'OTP',
+          outcome: 'SUCCESS',
+          societyId: society.id,
+        });
         await this.journal.commit(transaction, {
           action: 'auth.otp.verify',
           actor: {
@@ -502,151 +567,66 @@ export class AuthService {
     input: GuardSignInInput,
     context: MutationRequestContext,
   ): Promise<SessionTokenResponse> {
-    const society = await this.activeSociety();
-    const guard = await this.database.client.guardProfile.findFirst({
-      include: { user: true },
-      where: {
-        employeeCode: input.employeeCode,
-        societyId: society.id,
-        status: GuardStatus.ACTIVE,
-        user: { status: UserStatus.ACTIVE },
-      },
-    });
-    if (!guard || !(await this.passwordHasher.verify(input.pin, guard.pinHash, 'GUARD_PIN'))) {
-      throw authenticationFailure();
-    }
-    return this.createCredentialSession({
-      context,
-      device: input.device,
-      kind: 'GUARD',
-      method: 'GUARD_PIN',
-      societyId: society.id,
-      userId: guard.userId,
-    });
+    return this.guardAuth.signIn(input, context);
   }
 
   async signInAdmin(
     input: AdminSignInInput,
     context: MutationRequestContext,
   ): Promise<SessionTokenResponse> {
-    const society = await this.activeSociety();
-    const now = new Date();
-    const user = await this.database.client.user.findFirst({
-      include: {
-        roleAssignments: {
-          include: { role: true },
-          where: {
-            startsAt: { lte: now },
-            revokedAt: null,
-            OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-            role: {
-              code: { in: ['SOCIETY_ADMIN', 'SUPER_ADMIN'] },
-              status: RecordStatus.ACTIVE,
-            },
-          },
-        },
-      },
-      where: {
-        email: { equals: input.email, mode: 'insensitive' },
-        societyId: society.id,
-        status: UserStatus.ACTIVE,
-      },
-    });
-    if (
-      !user?.passwordHash ||
-      user.roleAssignments.length === 0 ||
-      !(await this.passwordHasher.verify(input.password, user.passwordHash, 'ADMIN_PASSWORD'))
-    ) {
-      throw authenticationFailure();
-    }
-    if (user.mfaEnabled) {
-      if (!input.mfaCode || !this.mfaVerifier) {
-        throw new ApiError({
-          code: 'MFA_PROVIDER_UNAVAILABLE',
-          details: {},
-          message: 'Multi-factor verification is required but unavailable.',
-          status: HttpStatus.SERVICE_UNAVAILABLE,
-        });
-      }
-      const verified = await this.mfaVerifier.verify({
-        code: input.mfaCode,
-        userId: user.id,
-      });
-      if (!verified) {
-        throw authenticationFailure();
-      }
-    }
-    return this.createCredentialSession({
-      context,
-      device: input.device,
-      kind: 'PRIVILEGED',
-      method: 'ADMIN_PASSWORD_MFA',
-      societyId: society.id,
-      userId: user.id,
-    });
+    return this.adminAuth.signIn(input, context);
   }
 
-  private async createCredentialSession(input: {
-    readonly context: MutationRequestContext;
-    readonly device: AuthDeviceInput;
-    readonly kind: 'GUARD' | 'PRIVILEGED';
-    readonly method: string;
-    readonly societyId: string;
-    readonly userId: string;
-  }): Promise<SessionTokenResponse> {
-    const deviceDigest = this.digests.deviceFingerprint(input.device.fingerprint, input.societyId);
-    const actor = {
-      actorScopeKey: `credential:${input.userId}:${deviceDigest}`.slice(0, 200),
-      userId: input.userId,
+  private async commitOtpAttemptFailure(
+    transaction: Prisma.TransactionClient,
+    input: {
+      readonly actor: { readonly actorScopeKey: string };
+      readonly attemptKeys: CredentialAttemptKeys;
+      readonly attemptOutcome: 'BLOCKED' | 'FAILURE';
+      readonly challengeId: string;
+      readonly claimId: string;
+      readonly code: string;
+      readonly context: MutationRequestContext;
+      readonly societyId: string;
+      readonly status?: HttpStatus;
+    },
+  ): Promise<StoredOutcome<SessionTokenResponse>> {
+    await this.attempts.record(transaction, {
+      ...input.attemptKeys,
+      failureCode: input.code,
+      method: 'OTP',
+      outcome: input.attemptOutcome,
+      societyId: input.societyId,
+    });
+    const status = input.status ?? HttpStatus.UNAUTHORIZED;
+    const message =
+      input.code === 'AUTHENTICATION_RATE_LIMITED'
+        ? 'Too many authentication attempts. Try again later.'
+        : input.code === 'OTP_SUPERSEDED'
+          ? 'A newer OTP challenge has replaced this one.'
+          : 'The OTP is invalid.';
+    const stored: StoredOutcome<SessionTokenResponse> = {
+      error: { code: input.code, details: {}, message, status },
+      ok: false,
     };
-    const outcome = await this.database.client.$transaction(
-      async (transaction) => {
-        const claim = await this.journal.begin<StoredOutcome<SessionTokenResponse>>(transaction, {
-          actor,
-          idempotencyKey: input.context.idempotencyKey,
-          operation: 'auth.credential.sign_in',
-          request: { deviceDigest, method: input.method, userId: input.userId },
-          societyId: input.societyId,
-        });
-        if (claim.kind === 'replay') {
-          return claim.response;
-        }
-        const tokens = await this.sessions.createWithinTransaction(transaction, {
-          context: input.context,
-          device: input.device,
-          kind: input.kind,
-          societyId: input.societyId,
-          userId: input.userId,
-        });
-        const stored: StoredOutcome<SessionTokenResponse> = {
-          data: tokens,
-          ok: true,
-        };
-        await this.journal.commit(transaction, {
-          action: 'auth.credential.sign_in',
-          actor: {
-            ...actor,
-            actorScopeKey: `session:${tokens.sessionId}`,
-            sessionId: tokens.sessionId,
-          },
-          aggregateId: tokens.sessionId,
-          aggregateType: 'UserSession',
-          correlationId: input.context.databaseCorrelationId,
-          entityId: input.userId,
-          entityType: 'User',
-          eventType: 'auth.session.created',
-          idempotencyRecordId: claim.recordId,
-          metadata: { ipAddress: input.context.ipAddress, method: input.method },
-          newValues: { sessionId: tokens.sessionId },
-          response: stored,
-          responseStatus: HttpStatus.CREATED,
-          societyId: input.societyId,
-        });
-        return stored;
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
-    return unwrapOutcome(outcome);
+    await this.journal.commit(transaction, {
+      action: 'auth.otp.verify_failed',
+      actor: input.actor,
+      aggregateId: input.challengeId,
+      aggregateType: 'OtpChallenge',
+      auditOutcome: AuditOutcome.FAILURE,
+      correlationId: input.context.databaseCorrelationId,
+      entityId: input.challengeId,
+      entityType: 'OtpChallenge',
+      eventType: 'auth.otp.verification_failed',
+      idempotencyRecordId: input.claimId,
+      metadata: { failureCode: input.code, ipAddress: input.context.ipAddress },
+      reason: input.code,
+      response: stored,
+      responseStatus: status,
+      societyId: input.societyId,
+    });
+    return stored;
   }
 
   private async enforceOtpRateLimits(
@@ -719,13 +699,12 @@ export class AuthService {
     let claim: {
       readonly attempt: number;
       readonly eventId: string;
-      readonly payload: Prisma.JsonValue;
     } | null = null;
 
     try {
       claim = await this.database.client.$transaction(async (transaction) => {
         const event = await transaction.outboxEvent.findFirst({
-          select: { attemptCount: true, id: true, payload: true },
+          select: { attemptCount: true, id: true },
           where: {
             availableAt: { lte: new Date() },
             dedupeKey,
@@ -746,7 +725,6 @@ export class AuthService {
           ? {
               attempt: event.attemptCount + 1,
               eventId: event.id,
-              payload: event.payload,
             }
           : null;
       });
@@ -758,19 +736,12 @@ export class AuthService {
     if (!claim) return;
 
     try {
-      const receipt = await this.otpDelivery.send(delivery);
+      await this.otpDelivery.send(delivery);
       await this.database.client.$transaction(async (transaction) => {
         const updated = await transaction.outboxEvent.updateMany({
           data: {
             attemptCount: claim.attempt,
             lastErrorCode: null,
-            payload: {
-              ...(claim.payload as Record<string, Prisma.JsonValue>),
-              deliveryReceipt: {
-                providerMessageId: receipt.providerMessageId,
-                queuedAt: receipt.queuedAt.toISOString(),
-              },
-            },
             publishedAt: new Date(),
             status: OutboxStatus.PUBLISHED,
           },
@@ -831,7 +802,10 @@ export class AuthService {
     const society = await this.database.client.society.findFirst({
       orderBy: { createdAt: 'asc' },
       select: { id: true },
-      where: { status: RecordStatus.ACTIVE },
+      where: {
+        singletonKey: 'MANGLAM_BALAJI',
+        status: RecordStatus.ACTIVE,
+      },
     });
     if (!society) {
       throw new ApiError({
@@ -852,20 +826,4 @@ function unwrapOutcome<T>(outcome: StoredOutcome<T>): T {
   throw new ApiError(outcome.error);
 }
 
-function otpFailure(code: string, message: string): ApiError {
-  return new ApiError({
-    code,
-    details: {},
-    message,
-    status: HttpStatus.UNAUTHORIZED,
-  });
-}
 
-function authenticationFailure(): ApiError {
-  return new ApiError({
-    code: 'AUTHENTICATION_REQUIRED',
-    details: {},
-    message: 'The supplied credentials are invalid.',
-    status: HttpStatus.UNAUTHORIZED,
-  });
-}

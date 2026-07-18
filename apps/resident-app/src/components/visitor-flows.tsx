@@ -22,7 +22,11 @@ import { visitorApi } from '@/lib/resident-api';
 import { useConnectivity } from '@/providers/ConnectivityProvider';
 import { colors, spacing, typography } from '@/theme/tokens';
 
-function present(query: { error: unknown; isLoading: boolean; refetch: () => unknown }) {
+function useQueryPresentation(query: {
+  error: unknown;
+  isLoading: boolean;
+  refetch: () => unknown;
+}) {
   const connection = useConnectivity();
   return {
     error: query.error,
@@ -57,7 +61,7 @@ export function VisitorsScreen() {
         title="Visitors"
       />
       <Button onPress={() => router.push('/visitor/new')}>Pre-approve visitor</Button>
-      <QueryState {...present(pre)}>
+      <QueryState {...useQueryPresentation(pre)}>
         <Section title="Active pre-approvals">
           {(pre.data?.items.length ?? 0) === 0 ? (
             <Row
@@ -142,9 +146,12 @@ export function VisitorPreApprovalScreen() {
       return;
     }
     mutation.mutate({
-      ...result.data,
       category: values.category,
       expectedAt: expectedAt.toISOString(),
+      visitorName: result.data.visitorName,
+      ...(result.data.purpose ? { purpose: result.data.purpose } : {}),
+      ...(result.data.vehicleNumber ? { vehicleNumber: result.data.vehicleNumber } : {}),
+      ...(result.data.visitorPhone ? { visitorPhone: result.data.visitorPhone } : {}),
     });
   });
   return (
@@ -273,7 +280,7 @@ export function VisitorDetailScreen({ id }: { id: string }) {
         subtitle="The current status is supplied by the gate system."
         title="Visitor details"
       />
-      <QueryState {...present(visit)}>
+      <QueryState {...useQueryPresentation(visit)}>
         {data ? (
           <>
             <Section>
@@ -287,7 +294,10 @@ export function VisitorDetailScreen({ id }: { id: string }) {
               <Row detail={formatDateTime(data.checkedInAt)} title="Checked in" />
               <Row detail={formatDateTime(data.checkedOutAt)} title="Checked out" />
             </Section>
-            {'code' in data && data.status !== 'CANCELLED' && data.status !== 'CHECKED_IN' ? (
+            {'code' in data &&
+            typeof data.code === 'string' &&
+            data.status !== 'CANCELLED' &&
+            data.status !== 'CHECKED_IN' ? (
               <Section title="Gate code">
                 <Row detail={data.code} title="Show this code to the guard" />
                 <Button

@@ -45,6 +45,7 @@ export interface CommitMutationInput<TResponse> {
   readonly idempotencyRecordId: string;
   readonly metadata?: Record<string, unknown>;
   readonly outboxPayload?: Record<string, unknown>;
+  readonly outboxPayloadMode?: 'DURABLE_CONTEXT' | 'EXACT';
   readonly newValues?: Record<string, unknown>;
   readonly operationKey?: string;
   readonly previousValues?: Record<string, unknown>;
@@ -171,12 +172,15 @@ export class MutationJournalService {
     transaction: TransactionClient,
     input: CommitMutationInput<TResponse>,
   ): Promise<void> {
-    const outboxPayload = {
-      aggregateId: input.aggregateId,
-      correlationId: input.correlationId,
-      societyId: input.societyId,
-      ...(input.outboxPayload ?? {}),
-    };
+    const outboxPayload =
+      input.outboxPayloadMode === 'EXACT'
+        ? (input.outboxPayload ?? {})
+        : {
+            aggregateId: input.aggregateId,
+            correlationId: input.correlationId,
+            societyId: input.societyId,
+            ...(input.outboxPayload ?? {}),
+          };
     assertSafeOutboxPayload(input.eventType, outboxPayload);
 
     await this.appendAudit(transaction, input);

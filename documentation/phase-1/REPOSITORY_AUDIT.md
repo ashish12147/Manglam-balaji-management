@@ -23,7 +23,7 @@ reverted.
 | ------- | --------------------------------------- |
 | Node.js | `v24.14.0`                              |
 | npm     | `11.9.0`                                |
-| pnpm    | `11.7.0`                                |
+| pnpm    | `11.9.0`                                |
 | Git     | Repository on `main`, remote configured |
 | Docker  | Not installed                           |
 

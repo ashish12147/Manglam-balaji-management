@@ -29,7 +29,12 @@ export class AccessSessionGuard implements CanActivate {
     const fingerprintHeader = request.headers['x-device-fingerprint'];
     const fingerprint = Array.isArray(fingerprintHeader) ? fingerprintHeader[0] : fingerprintHeader;
 
-    if (!authorization?.startsWith('Bearer ') || !fingerprint) {
+    if (
+      !authorization?.startsWith('Bearer ') ||
+      typeof fingerprint !== 'string' ||
+      fingerprint.length < 32 ||
+      fingerprint.length > 256
+    ) {
       throw this.unauthorized();
     }
 

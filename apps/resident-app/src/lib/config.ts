@@ -13,11 +13,27 @@ const absoluteUrl = z
     },
   );
 
-const runtimeConfigSchema = z.object({
-  apiUrl: absoluteUrl,
-  appEnv: z.enum(['development', 'staging', 'production']).default('development'),
-  wsUrl: absoluteUrl,
-});
+const runtimeConfigSchema = z
+  .object({
+    apiUrl: absoluteUrl,
+    appEnv: z.enum(['development', 'staging', 'production']).default('development'),
+    wsUrl: absoluteUrl,
+  })
+  .superRefine((value, context) => {
+    if (value.appEnv !== 'production') return;
+    for (const [path, url] of [
+      ['apiUrl', value.apiUrl],
+      ['wsUrl', value.wsUrl],
+    ] as const) {
+      if (!url.startsWith('https://')) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Production endpoints must use HTTPS.',
+          path: [path],
+        });
+      }
+    }
+  });
 
 export type RuntimeConfig = z.infer<typeof runtimeConfigSchema>;
 

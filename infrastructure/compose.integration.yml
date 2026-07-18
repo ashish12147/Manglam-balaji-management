@@ -1,0 +1,278 @@
+name: manglam-balaji
+
+x-service-security: &service-security
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+
+x-app-environment: &app-environment
+  APP_ENV: development
+  DATABASE_URL: postgresql://${POSTGRES_USER:-manglam}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-manglam}?schema=public
+  REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+  REDIS_PREFIX: manglam:local
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: ${S3_REGION:-ap-south-1}
+  S3_BUCKET: ${S3_BUCKET:-manglam-private}
+  S3_ACCESS_KEY_ID: ${MINIO_APP_ACCESS_KEY}
+  S3_SECRET_ACCESS_KEY: ${MINIO_APP_SECRET_KEY}
+  S3_FORCE_PATH_STYLE: 'true'
+
+services:
+  postgres:
+    <<: *service-security
+    image: postgres:17.10-alpine3.23
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-manglam}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=scram-sha-256
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER:-manglam}
+    command:
+      [
+        'postgres',
+        '-c',
+        'password_encryption=scram-sha-256',
+        '-c',
+        'log_connections=on',
+        '-c',
+        'log_disconnections=on',
+        '-c',
+        'log_min_duration_statement=500',
+      ]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    ports:
+      - 127.0.0.1:${POSTGRES_PORT:-5432}:5432
+    tmpfs:
+      - /var/run/postgresql:size=16m,mode=0770
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [backend]
+    deploy:
+      resources:
+        limits: { cpus: '2.0', memory: 2g }
+
+  redis:
+    <<: *service-security
+    image: redis:8.8.0-alpine3.23
+    command:
+      [
+        'redis-server',
+        '--appendonly',
+        'yes',
+        '--appendfsync',
+        'everysec',
+        '--requirepass',
+        '${REDIS_PASSWORD}',
+        '--maxmemory-policy',
+        'noeviction',
+      ]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    healthcheck:
+      test: ['CMD-SHELL', "redis-cli -a '$${REDIS_PASSWORD}' --no-auth-warning ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    ports:
+      - 127.0.0.1:${REDIS_PORT:-6379}:6379
+    volumes:
+      - redis-data:/data
+    networks: [backend]
+    deploy:
+      resources:
+        limits: { cpus: '1.0', memory: 768m }
+
+  minio:
+    <<: *service-security
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+    healthcheck:
+      test: ['CMD', 'curl', '--fail', 'http://127.0.0.1:9000/minio/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    ports:
+      - 127.0.0.1:${MINIO_API_PORT:-9000}:9000
+      - 127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001
+    volumes:
+      - minio-data:/data
+    networks: [backend]
+    deploy:
+      resources:
+        limits: { cpus: '1.5', memory: 1g }
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    restart: 'no'
+    depends_on:
+      minio: { condition: service_healthy }
+    environment:
+      MINIO_APP_ACCESS_KEY: ${MINIO_APP_ACCESS_KEY}
+      MINIO_APP_SECRET_KEY: ${MINIO_APP_SECRET_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      S3_BUCKET: ${S3_BUCKET:-manglam-private}
+    entrypoint: ['/bin/sh', '/bootstrap/bootstrap-minio.sh']
+    read_only: true
+    security_opt: ['no-new-privileges:true']
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    volumes:
+      - ./minio:/bootstrap:ro
+    networks: [backend]
+
+  clamav:
+    <<: *service-security
+    image: clamav/clamav:1.5.3
+    healthcheck:
+      test: ['CMD-SHELL', 'clamdscan --ping 1 --wait >/dev/null 2>&1']
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+    volumes:
+      - clamav-signatures:/var/lib/clamav
+    networks: [backend]
+    deploy:
+      resources:
+        limits: { cpus: '2.0', memory: 2g }
+
+  migrate:
+    profiles: [app, migrate]
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile
+      target: migration
+    restart: 'no'
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-manglam}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-manglam}?schema=public
+    networks: [backend]
+    security_opt: ['no-new-privileges:true']
+
+  api:
+    <<: *service-security
+    profiles: [app]
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile
+      target: api
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      minio-init: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    environment:
+      <<: *app-environment
+      NODE_ENV: production
+      PORT: 4000
+      API_PREFIX: /api/v1
+      APP_VERSION: ${APP_VERSION:-local}
+      ADMIN_WEB_URL: http://127.0.0.1:3000
+      PUBLIC_API_URL: http://127.0.0.1:4000/api/v1
+      CORS_ORIGINS: http://127.0.0.1:3000
+      WS_ORIGINS: http://127.0.0.1:3000
+      TRUST_PROXY: 'false'
+      API_DOCS_ENABLED: 'false'
+      ADMIN_PASSWORD_PEPPER: ${ADMIN_PASSWORD_PEPPER}
+      GUARD_PIN_PEPPER: ${GUARD_PIN_PEPPER}
+      RESIDENT_APP_PIN_PEPPER: ${RESIDENT_APP_PIN_PEPPER}
+      COOKIE_SECRET: ${COOKIE_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      JWT_AUDIENCE: manglam-clients
+      JWT_ISSUER: manglam-local-api
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+      OTP_HMAC_SECRET: ${OTP_HMAC_SECRET}
+      REFRESH_TOKEN_PEPPER: ${REFRESH_TOKEN_PEPPER}
+      VISITOR_CODE_HMAC_SECRET: ${VISITOR_CODE_HMAC_SECRET}
+      OTP_PROVIDER: ${OTP_PROVIDER}
+      MSG91_AUTH_KEY: ${MSG91_AUTH_KEY:-}
+      MSG91_TEMPLATE_ID: ${MSG91_TEMPLATE_ID:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_MESSAGING_SERVICE_SID: ${TWILIO_MESSAGING_SERVICE_SID:-}
+      PUSH_PROVIDER: ${PUSH_PROVIDER}
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+      FCM_CLIENT_EMAIL: ${FCM_CLIENT_EMAIL:-}
+      FCM_PRIVATE_KEY: ${FCM_PRIVATE_KEY:-}
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+    ports:
+      - 127.0.0.1:${API_PORT:-4000}:4000
+    networks: [backend, edge]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+
+  worker:
+    <<: *service-security
+    profiles: [app]
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile
+      target: worker
+    depends_on:
+      api: { condition: service_healthy }
+      clamav: { condition: service_healthy }
+    environment:
+      <<: *app-environment
+      NODE_ENV: production
+      WORKER_ID: local-worker-1
+      WORKER_HEALTH_PORT: 4010
+      CLAMAV_HOST: clamav
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      CLAMAV_PORT: 3310
+      OTP_PROVIDER: ${OTP_PROVIDER}
+      PUSH_PROVIDERS: ${PUSH_PROVIDER}
+      MSG91_AUTH_KEY: ${MSG91_AUTH_KEY:-}
+      MSG91_TEMPLATE_ID: ${MSG91_TEMPLATE_ID:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_MESSAGING_SERVICE_SID: ${TWILIO_MESSAGING_SERVICE_SID:-}
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+      FCM_CLIENT_EMAIL: ${FCM_CLIENT_EMAIL:-}
+      FCM_PRIVATE_KEY: ${FCM_PRIVATE_KEY:-}
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+      UPLOAD_ALLOWED_MIME_TYPES: image/jpeg,image/png,application/pdf
+      UPLOAD_MAX_BYTES: 10485760
+    networks: [backend]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+
+  admin-web:
+    <<: *service-security
+    profiles: [app]
+    build:
+      context: ..
+      dockerfile: infrastructure/docker/Dockerfile
+      target: admin-web
+      args:
+        NEXT_PUBLIC_API_URL: http://127.0.0.1:${API_PORT:-4000}/api/v1
+    depends_on:
+      api: { condition: service_healthy }
+    ports:
+      - 127.0.0.1:${ADMIN_PORT:-3000}:3000
+    networks: [edge]
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+
+networks:
+  backend:
+    internal: true
+  edge:
+
+volumes:
+  clamav-signatures:
+  minio-data:
+  postgres-data:
+  redis-data:

@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   DeviceStatus,
+  GuardStatus,
   MembershipStatus,
   RecordStatus,
   SessionStatus,
@@ -129,6 +130,14 @@ export class CurrentIdentityService {
     ) {
       throw authenticationFailure();
     }
+    if (
+      session.kind === 'GUARD' &&
+      (session.user.guardProfile?.status !== GuardStatus.ACTIVE ||
+        session.device.guardDevice?.status !== DeviceStatus.ACTIVE)
+    ) {
+      throw authenticationFailure();
+    }
+
 
     const fingerprintDigest = this.digests.deviceFingerprint(
       deviceFingerprint,

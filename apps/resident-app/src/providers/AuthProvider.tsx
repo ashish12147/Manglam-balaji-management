@@ -114,8 +114,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     apiClient.setRefreshHandler(refreshSession);
-    void refreshSession().catch(() => undefined);
     return () => apiClient.setRefreshHandler(null);
+  }, [refreshSession]);
+
+  useEffect(() => {
+    const recoveryTimer = setTimeout(() => {
+      void refreshSession().catch(() => undefined);
+    }, 0);
+    return () => {
+      clearTimeout(recoveryTimer);
+    };
   }, [refreshSession]);
 
   const requestOtp = useCallback(async (phone: string) => {

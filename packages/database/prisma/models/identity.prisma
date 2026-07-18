@@ -1,39 +1,87 @@
 model User {
-  id                    String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  societyId             String                   @map("society_id") @db.Uuid
-  normalizedPhone       String                   @map("normalized_phone") @db.VarChar(16)
-  phoneDigest           String                   @map("phone_digest") @db.Char(64)
-  email                 String?                  @db.VarChar(254)
-  displayName           String                   @map("display_name") @db.VarChar(120)
-  status                UserStatus               @default(PENDING)
-  preferredLocale       String                   @default("en-IN") @map("preferred_locale") @db.VarChar(16)
-  passwordHash          String?                  @map("password_hash") @db.VarChar(255)
-  appPinHash            String?                  @map("app_pin_hash") @db.VarChar(255)
-  mfaEnabled            Boolean                  @default(false) @map("mfa_enabled")
-  lastAuthenticatedAt   DateTime?                @map("last_authenticated_at") @db.Timestamptz(6)
-  deactivatedAt         DateTime?                @map("deactivated_at") @db.Timestamptz(6)
-  deactivationReason    String?                  @map("deactivation_reason") @db.VarChar(500)
-  version               Int                      @default(1)
-  createdAt             DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
-  society               Society                  @relation(fields: [societyId], references: [id], onDelete: Restrict)
-  sessions              UserSession[]
-  devices               Device[]
-  pushEndpoints         PushEndpoint[]
-  roleAssignments       UserRole[]
-  memberships           FlatMembership[]
-  guardProfile          GuardProfile?
-  noticeRecipients      NoticeRecipient[]
-  noticeReads           NoticeRead[]
-  noticeAcknowledgments NoticeAcknowledgement[]
-  notificationPrefs     NotificationPreference[]
-  notifications         Notification[]
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId              String                   @map("society_id") @db.Uuid
+  normalizedPhone        String                   @map("normalized_phone") @db.VarChar(16)
+  phoneDigest            String                   @map("phone_digest") @db.Char(64)
+  email                  String?                  @db.VarChar(254)
+  displayName            String                   @map("display_name") @db.VarChar(120)
+  status                 UserStatus               @default(PENDING)
+  preferredLocale        String                   @default("en-IN") @map("preferred_locale") @db.VarChar(16)
+  passwordHash           String?                  @map("password_hash") @db.VarChar(255)
+  appPinHash             String?                  @map("app_pin_hash") @db.VarChar(255)
+  mfaEnabled             Boolean                  @default(false) @map("mfa_enabled")
+  lastAuthenticatedAt    DateTime?                @map("last_authenticated_at") @db.Timestamptz(6)
+  deactivatedAt          DateTime?                @map("deactivated_at") @db.Timestamptz(6)
+  deactivationReason     String?                  @map("deactivation_reason") @db.VarChar(500)
+  version                Int                      @default(1)
+  createdAt              DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society                Society                  @relation(fields: [societyId], references: [id], onDelete: Restrict)
+  mfaCredentials         MfaCredential[]
+  sessions               UserSession[]
+  devices                Device[]
+  pushEndpoints          PushEndpoint[]
+  roleAssignments        UserRole[]
+  memberships            FlatMembership[]
+  guardProfile           GuardProfile?
+  noticeRecipients       NoticeRecipient[]
+  noticeReads            NoticeRead[]
+  noticeAcknowledgments  NoticeAcknowledgement[]
+  notificationPrefs      NotificationPreference[]
+  notifications          Notification[]
+  registeredGuardDevices GuardDevice[]            @relation("GuardDeviceRegistrar")
 
   @@unique([societyId, normalizedPhone], map: "users_society_id_phone_key")
   @@unique([societyId, id], map: "users_society_id_id_key")
   @@index([societyId, status], map: "users_society_id_status_idx")
   @@index([phoneDigest], map: "users_phone_digest_idx")
   @@map("users")
+}
+
+model MfaCredential {
+  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId           String              @map("society_id") @db.Uuid
+  userId              String              @map("user_id") @db.Uuid
+  type                MfaCredentialType   @default(TOTP)
+  status              MfaCredentialStatus @default(PENDING)
+  secretCiphertext    Bytes               @map("secret_ciphertext") @db.ByteA
+  secretNonce         Bytes               @map("secret_nonce") @db.ByteA
+  secretAuthTag       Bytes               @map("secret_auth_tag") @db.ByteA
+  keyVersion          Int                 @default(1) @map("key_version")
+  encryptionAlgorithm String              @default("AES-256-GCM") @map("encryption_algorithm") @db.VarChar(32)
+  label               String?             @db.VarChar(80)
+  confirmedAt         DateTime?           @map("confirmed_at") @db.Timestamptz(6)
+  lastUsedTimeStep    BigInt?             @map("last_used_time_step")
+  revokedAt           DateTime?           @map("revoked_at") @db.Timestamptz(6)
+  revocationReason    String?             @map("revocation_reason") @db.VarChar(500)
+  version             Int                 @default(1)
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society             Society             @relation(fields: [societyId], references: [id], onDelete: Restrict)
+  user                User                @relation(fields: [societyId, userId], references: [societyId, id], onDelete: Restrict)
+
+  @@unique([societyId, id], map: "mfa_credentials_society_id_id_key")
+  @@index([societyId, userId, status], map: "mfa_credentials_society_user_status_idx")
+  @@map("mfa_credentials")
+}
+
+model AuthenticationAttempt {
+  id             String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId      String                       @map("society_id") @db.Uuid
+  subjectDigest  String                       @map("subject_digest") @db.Char(64)
+  originDigest   String?                      @map("origin_digest") @db.Char(64)
+  method         AuthenticationMethod
+  outcome        AuthenticationAttemptOutcome
+  failureCode    String?                      @map("failure_code") @db.VarChar(80)
+  occurredAt     DateTime                     @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  retentionUntil DateTime                     @map("retention_until") @db.Timestamptz(6)
+  society        Society                      @relation(fields: [societyId], references: [id], onDelete: Restrict)
+
+  @@unique([societyId, id], map: "authentication_attempts_society_id_id_key")
+  @@index([societyId, method, subjectDigest, occurredAt(sort: Desc)], map: "auth_attempts_subject_recent_idx")
+  @@index([societyId, method, originDigest, occurredAt(sort: Desc)], map: "auth_attempts_origin_recent_idx")
+  @@index([retentionUntil], map: "auth_attempts_retention_until_idx")
+  @@map("authentication_attempts")
 }
 
 model OtpChallenge {

@@ -1,0 +1,12 @@
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    environment: 'node',
+    fileParallelism: false,
+    include: ['test/**/*.e2e.spec.ts'],
+    passWithNoTests: false,
+    restoreMocks: true,
+    testTimeout: 20_000,
+  },
+});

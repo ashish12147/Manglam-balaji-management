@@ -145,7 +145,7 @@ export interface Notice {
   isRead: boolean;
   acknowledgedAt: string | null;
   requiresAcknowledgement: boolean;
-  attachments: Array<{ id: string; fileName: string; mimeType: string }>;
+  attachments: { id: string; fileName: string; mimeType: string }[];
 }
 
 export type ComplaintStatus =
@@ -176,8 +176,8 @@ export interface Complaint {
   updatedAt: string;
   resolutionNote: string | null;
   comments: ComplaintComment[];
-  history: Array<{ id: string; status: ComplaintStatus; occurredAt: string; note: string | null }>;
-  attachments: Array<{ id: string; fileName: string; mimeType: string }>;
+  history: { id: string; status: ComplaintStatus; occurredAt: string; note: string | null }[];
+  attachments: { id: string; fileName: string; mimeType: string }[];
 }
 
 export interface ComplaintCategory {

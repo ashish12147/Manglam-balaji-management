@@ -1,0 +1,49 @@
+{
+  "name": "@manglam/guard-app",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "android": "expo start --android",
+    "build": "expo export --platform android --output-dir dist",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "dev": "expo start --dev-client",
+    "lint": "eslint .",
+    "start": "expo start --dev-client",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "5.4.0",
+    "@tanstack/react-query": "5.101.2",
+    "expo": "~56.0.15",
+    "expo-constants": "~56.0.20",
+    "expo-crypto": "~56.0.4",
+    "expo-device": "~56.0.4",
+    "expo-image-picker": "~56.0.21",
+    "expo-network": "~56.0.5",
+    "expo-notifications": "~56.0.20",
+    "expo-router": "~56.2.14",
+    "expo-secure-store": "~56.0.4",
+    "expo-splash-screen": "~56.0.12",
+    "expo-sqlite": "~56.0.5",
+    "expo-status-bar": "~56.0.4",
+    "lucide-react-native": "1.24.0",
+    "react": "19.2.3",
+    "react-hook-form": "7.81.0",
+    "react-native": "0.85.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "4.25.2",
+    "react-native-svg": "15.15.4",
+    "socket.io-client": "4.8.1",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "eslint": "9.39.1",
+    "eslint-config-expo": "~56.0.0",
+    "typescript": "~6.0.3",
+    "vitest": "4.0.16"
+  }
+}

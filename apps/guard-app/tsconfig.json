@@ -1,0 +1,17 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "allowJs": false,
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "strict": true,
+    "types": ["vitest/globals"]
+  },
+  "include": ["app", "src", "expo-env.d.ts", ".expo/types/**/*.ts"]
+}

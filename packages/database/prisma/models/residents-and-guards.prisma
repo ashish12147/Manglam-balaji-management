@@ -101,7 +101,7 @@ model GuardProfile {
 model GuardDevice {
   id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   societyId             String              @map("society_id") @db.Uuid
-  deviceId              String              @unique(map: "guard_devices_device_id_key") @map("device_id") @db.Uuid
+  deviceId              String              @map("device_id") @db.Uuid
   enrollmentTokenDigest String?             @map("enrollment_token_digest") @db.Char(64)
   enrollmentExpiresAt   DateTime?           @map("enrollment_expires_at") @db.Timestamptz(6)
   keyId                 String?             @map("key_id") @db.VarChar(120)
@@ -113,11 +113,14 @@ model GuardDevice {
   version               Int                 @default(1)
   createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
-  device                Device              @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  device                Device              @relation(fields: [societyId, deviceId], references: [societyId, id], onDelete: Restrict)
+  registeredByUser      User?               @relation("GuardDeviceRegistrar", fields: [societyId, registeredByUserId], references: [societyId, id], onDelete: Restrict)
   gateAssignments       GuardDeviceGate[]
   offlineRecords        OfflineSyncRecord[]
 
   @@unique([societyId, id], map: "guard_devices_society_id_id_key")
+  @@unique([societyId, deviceId], map: "guard_devices_society_device_key")
+  @@index([enrollmentTokenDigest, status, enrollmentExpiresAt], map: "guard_devices_enrollment_activation_idx")
   @@index([societyId, status], map: "guard_devices_society_status_idx")
   @@map("guard_devices")
 }

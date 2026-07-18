@@ -278,3 +278,31 @@ model OfflineSyncAttempt {
   @@index([syncRecordId, occurredAt], map: "offline_sync_attempts_record_occurred_idx")
   @@map("offline_sync_attempts")
 }
+
+model RetentionPolicy {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  societyId     String              @map("society_id") @db.Uuid
+  entityType    RetentionEntityType @default(FILE_UPLOAD) @map("entity_type")
+  filePurpose   FilePurpose?        @map("file_purpose")
+  retentionDays Int                 @map("retention_days")
+  active        Boolean             @default(true)
+  version       Int                 @default(1)
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  society       Society             @relation(fields: [societyId], references: [id], onDelete: Restrict)
+
+  @@unique([societyId, id], map: "retention_policies_society_id_id_key")
+  @@index([societyId, active, entityType], map: "retention_policies_society_active_entity_idx")
+  @@map("retention_policies")
+}
+
+model WorkerHeartbeat {
+  workerId   String               @id @map("worker_id") @db.VarChar(128)
+  state      WorkerHeartbeatState
+  startedAt  DateTime             @default(now()) @map("started_at") @db.Timestamptz(6)
+  lastSeenAt DateTime             @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  updatedAt  DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([state, lastSeenAt], map: "worker_heartbeats_state_last_seen_idx")
+  @@map("worker_heartbeats")
+}

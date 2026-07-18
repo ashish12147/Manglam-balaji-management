@@ -70,10 +70,9 @@ export function createDatabaseClient(options: DatabaseClientOptions = {}): Prism
   };
 
   const adapter = new PrismaPg(poolConfig);
-  return new PrismaClient({
-    adapter,
-    log: options.log,
-  });
+  return options.log === undefined
+    ? new PrismaClient({ adapter })
+    : new PrismaClient({ adapter, log: options.log });
 }
 
 export function getDatabaseClient(options: DatabaseClientOptions = {}): PrismaClient {

@@ -69,7 +69,6 @@ enum PushProvider {
   FCM
   EXPO
   WEB_PUSH
-  DEVELOPMENT
 }
 
 enum PushEndpointStatus {
@@ -470,6 +469,41 @@ enum SyncAttemptResult {
   FAILED
 }
 
+enum RetentionEntityType {
+  FILE_UPLOAD @map("file_upload")
+}
+
+enum WorkerHeartbeatState {
+  READY
+  DRAINING
+  FAILED
+}
+
+enum MfaCredentialType {
+  TOTP
+}
+
+enum MfaCredentialStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+}
+
+enum AuthenticationMethod {
+  OTP
+  ADMIN_PASSWORD
+  GUARD_PIN
+  RESIDENT_APP_PIN
+  TOTP
+  REFRESH_TOKEN
+}
+
+enum AuthenticationAttemptOutcome {
+  SUCCESS
+  FAILURE
+  BLOCKED
+}
+
 model Society {
   id                  String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   singletonKey        String                   @default("MANGLAM_BALAJI") @map("singleton_key") @db.VarChar(32)
@@ -497,6 +531,9 @@ model Society {
   fileUploads         FileUpload[]
   outboxEvents        OutboxEvent[]
   inboxMessages       InboxMessage[]
+  retentionPolicies   RetentionPolicy[]
+  mfaCredentials      MfaCredential[]
+  authAttempts        AuthenticationAttempt[]
   auditLogs           AuditLog[]
   idempotencyRecords  IdempotencyRecord[]
 

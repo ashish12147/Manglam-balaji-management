@@ -1,0 +1,50 @@
+{
+  "name": "@manglam/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nest build",
+    "clean": "rimraf dist coverage",
+    "dev": "nest start --watch",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/main.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1089.0",
+    "@aws-sdk/s3-request-presigner": "^3.1089.0",
+    "@manglam/database": "workspace:*",
+    "@nestjs/common": "^11.1.0",
+    "@nestjs/config": "^4.0.0",
+    "@nestjs/core": "^11.1.0",
+    "@nestjs/platform-express": "^11.1.0",
+    "@nestjs/swagger": "^11.2.0",
+    "@nestjs/throttler": "^6.5.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.1.0",
+    "google-auth-library": "^10.9.0",
+    "helmet": "^8.1.0",
+    "jose": "6.2.3",
+    "ioredis": "^5.11.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/testing": "^11.1.0",
+    "@types/cookie-parser": "^1.4.9",
+    "@types/express": "^5.0.3",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "^4.0.0",
+    "rimraf": "^6.1.2",
+    "supertest": "^7.1.4",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

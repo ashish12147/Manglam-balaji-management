@@ -1,4 +1,17 @@
+import * as Crypto from 'expo-crypto';
+
 import { apiClient, createIdempotencyKey } from '@/lib/api';
+import { getRuntimeConfig } from '@/lib/config';
+import {
+  bytesToBase64,
+  COMPLAINT_UPLOAD_MAX_BYTES,
+  detectComplaintMimeType,
+  isPendingFileScan,
+  parseFileScanStatus,
+  requireCleanFileScan,
+  requirePrivateUploadUrl,
+  requireSignedUploadHeaders,
+} from '@/lib/upload-contract';
 import type {
   ApiPage,
   AuthSessionPayload,
@@ -328,24 +341,50 @@ export const notificationApi = {
   }) => apiClient.request<void>('/notifications/push-endpoints', { body, method: 'POST' }),
 };
 
+interface FileState {
+  fileId: string;
+  scanStatus?: unknown;
+  status?: unknown;
+}
+
 export const fileApi = {
   createUpload: (body: {
+    bytes: number;
+    checksumSha256: string;
     fileName: string;
     mimeType: string;
-    ownerType: 'COMPLAINT';
-    size: number;
+    purpose: 'COMPLAINT_ATTACHMENT';
   }) =>
     apiClient.request<{ fileId: string; headers: Record<string, string>; uploadUrl: string }>(
       '/files/upload-intents',
-      { body, method: 'POST' },
+      {
+        body,
+        idempotencyKey: createIdempotencyKey('complaint-upload-intent'),
+        method: 'POST',
+      },
     ),
   completeUpload: (fileId: string) =>
-    apiClient.request<{ fileId: string; scanStatus: string }>(`/files/${fileId}/complete`, {
+    apiClient.request<FileState>(`/files/${fileId}/complete`, {
+      idempotencyKey: createIdempotencyKey('complaint-upload-complete'),
       method: 'POST',
     }),
   download: (fileId: string) =>
     apiClient.request<{ expiresAt: string; url: string }>(`/files/${fileId}/download`),
+  status: (fileId: string) => apiClient.request<FileState>(`/files/${fileId}`),
 };
+
+function scanStatusOf(file: FileState) {
+  return parseFileScanStatus(file.scanStatus ?? file.status);
+}
+
+async function waitForCleanFile(fileId: string, initial: FileState): Promise<void> {
+  let status = scanStatusOf(initial);
+  for (let attempt = 0; attempt < 30 && isPendingFileScan(status); attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    status = scanStatusOf(await fileApi.status(fileId));
+  }
+  requireCleanFileScan(status);
+}
 
 export async function uploadComplaintFile(input: {
   fileName: string;
@@ -353,20 +392,67 @@ export async function uploadComplaintFile(input: {
   size: number;
   uri: string;
 }): Promise<string> {
-  const intent = await fileApi.createUpload({
-    fileName: input.fileName,
-    mimeType: input.mimeType,
-    ownerType: 'COMPLAINT',
-    size: input.size,
-  });
   const local = await fetch(input.uri);
   if (!local.ok) throw new Error('The selected file could not be read.');
-  const response = await fetch(intent.uploadUrl, {
-    body: await local.blob(),
-    headers: { 'Content-Type': input.mimeType, ...intent.headers },
-    method: 'PUT',
+
+  const body = await local.arrayBuffer();
+  const bytes = body.byteLength;
+  if (bytes < 1 || bytes > COMPLAINT_UPLOAD_MAX_BYTES) {
+    throw new Error(
+      bytes < 1 ? 'The selected attachment is empty.' : 'The attachment must be 10 MB or smaller.',
+    );
+  }
+  if (input.size > 0 && input.size !== bytes) {
+    throw new Error('The selected attachment changed while it was being prepared.');
+  }
+
+  const mimeType = detectComplaintMimeType(body);
+  if (!mimeType) {
+    throw new Error('Only valid JPEG, PNG, WebP, or PDF attachments are allowed.');
+  }
+  const declaredMimeType = input.mimeType.trim().toLowerCase();
+  if (declaredMimeType !== 'application/octet-stream' && declaredMimeType !== mimeType) {
+    throw new Error('The attachment type does not match its file contents.');
+  }
+
+  const checksum = await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, body);
+  const checksumSha256 = bytesToBase64(checksum);
+  const intent = await fileApi.createUpload({
+    bytes,
+    checksumSha256,
+    fileName: input.fileName,
+    mimeType,
+    purpose: 'COMPLAINT_ATTACHMENT',
   });
-  if (!response.ok) throw new Error('The attachment upload was rejected.');
-  await fileApi.completeUpload(intent.fileId);
+  const uploadUrl = requirePrivateUploadUrl(
+    intent.uploadUrl,
+    getRuntimeConfig().appEnv === 'production',
+  );
+  const headers = requireSignedUploadHeaders(intent.headers, {
+    bytes,
+    checksumSha256,
+    mimeType,
+  });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const response = await fetch(uploadUrl, {
+      body,
+      headers,
+      method: 'PUT',
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error('The attachment upload was rejected.');
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('The attachment upload timed out. Try again.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  await waitForCleanFile(intent.fileId, await fileApi.completeUpload(intent.fileId));
   return intent.fileId;
 }

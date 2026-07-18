@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
@@ -24,7 +24,11 @@ import { complaintApi, noticeApi, uploadComplaintFile } from '@/lib/resident-api
 import { useConnectivity } from '@/providers/ConnectivityProvider';
 import { colors, spacing, typography } from '@/theme/tokens';
 
-function present(query: { error: unknown; isLoading: boolean; refetch: () => unknown }) {
+function useQueryPresentation(query: {
+  error: unknown;
+  isLoading: boolean;
+  refetch: () => unknown;
+}) {
   const c = useConnectivity();
   return {
     error: query.error,
@@ -58,7 +62,7 @@ export function UpdatesScreen() {
         subtitle="Notices and your recorded complaints."
         title="Updates"
       />
-      <QueryState {...present(notices)}>
+      <QueryState {...useQueryPresentation(notices)}>
         <Section title="Notices">
           {(notices.data?.items.length ?? 0) === 0 ? (
             <Row detail="There are no published notices for this home." title="No notices" />
@@ -124,7 +128,7 @@ export function NoticeDetailScreen({ id }: { id: string }) {
   return (
     <Screen>
       <PageHeader title="Notice" />
-      <QueryState {...present(notice)}>
+      <QueryState {...useQueryPresentation(notice)}>
         {data ? (
           <>
             <Section>
@@ -207,7 +211,13 @@ export function ComplaintNewScreen() {
             }),
           ]
         : undefined;
-      return complaintApi.create({ ...values, attachmentFileIds });
+      return complaintApi.create({
+        categoryId: values.categoryId,
+        description: values.description,
+        priority: values.priority,
+        subject: values.subject,
+        ...(attachmentFileIds ? { attachmentFileIds } : {}),
+      });
     },
     onSuccess: (complaint) => {
       void client.invalidateQueries({ queryKey: ['complaints'] });
@@ -237,7 +247,7 @@ export function ComplaintNewScreen() {
         subtitle="Attachments are uploaded to private storage and scanned by the server."
         title="New complaint"
       />
-      <QueryState {...present(categories)}>
+      <QueryState {...useQueryPresentation(categories)}>
         <Section>
           <View style={styles.form}>
             <Text style={styles.label}>Category</Text>
@@ -324,6 +334,7 @@ export function ComplaintDetailScreen({ id }: { id: string }) {
   const client = useQueryClient();
   const complaint = useApiQuery(['complaint', id], () => complaintApi.detail(id));
   const form = useForm({ defaultValues: { body: '' } });
+  const commentBody = useWatch({ control: form.control, name: 'body' });
   const comment = useMutation({
     mutationFn: (body: string) => complaintApi.comment(id, body),
     onSuccess: () => {
@@ -339,7 +350,7 @@ export function ComplaintDetailScreen({ id }: { id: string }) {
   return (
     <Screen>
       <PageHeader title="Complaint" />
-      <QueryState {...present(complaint)}>
+      <QueryState {...useQueryPresentation(complaint)}>
         {data ? (
           <>
             <Section>
@@ -397,7 +408,7 @@ export function ComplaintDetailScreen({ id }: { id: string }) {
                 )}
               />
               <Button
-                disabled={comment.isPending || form.watch('body').trim().length === 0}
+                disabled={comment.isPending || commentBody.trim().length === 0}
                 onPress={form.handleSubmit((v) => comment.mutate(v.body.trim()))}
               >
                 Add comment

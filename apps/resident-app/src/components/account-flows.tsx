@@ -15,7 +15,11 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useConnectivity } from '@/providers/ConnectivityProvider';
 import { colors, spacing, typography } from '@/theme/tokens';
 
-function present(query: { error: unknown; isLoading: boolean; refetch: () => unknown }) {
+function useQueryPresentation(query: {
+  error: unknown;
+  isLoading: boolean;
+  refetch: () => unknown;
+}) {
   const c = useConnectivity();
   return {
     error: query.error,
@@ -242,7 +246,7 @@ export function FamilyScreen() {
   return (
     <Screen>
       <PageHeader title="Family members" />
-      <QueryState {...present(family)}>
+      <QueryState {...useQueryPresentation(family)}>
         <Section>
           {(family.data?.items.length ?? 0) === 0 ? (
             <Row detail="No family members are recorded for this home." title="No family members" />
@@ -304,7 +308,7 @@ export function SessionsScreen() {
   return (
     <Screen>
       <PageHeader title="Sessions and security" />
-      <QueryState {...present(sessions)}>
+      <QueryState {...useQueryPresentation(sessions)}>
         <Section>
           {(sessions.data?.items.length ?? 0) === 0 ? (
             <Row detail="No active sessions were returned." title="No sessions" />
@@ -354,7 +358,7 @@ export function PreferencesScreen() {
         subtitle="Security-critical and emergency alerts are always enabled."
         title="Notification preferences"
       />
-      <QueryState {...present(preferences)}>
+      <QueryState {...useQueryPresentation(preferences)}>
         {data ? (
           <Section>
             {editable.map((key) => (

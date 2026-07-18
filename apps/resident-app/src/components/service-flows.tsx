@@ -22,7 +22,11 @@ import { dailyHelpApi, emergencyApi, maintenanceApi, parcelApi } from '@/lib/res
 import { useConnectivity } from '@/providers/ConnectivityProvider';
 import { colors, spacing, typography } from '@/theme/tokens';
 
-function present(query: { error: unknown; isLoading: boolean; refetch: () => unknown }) {
+function useQueryPresentation(query: {
+  error: unknown;
+  isLoading: boolean;
+  refetch: () => unknown;
+}) {
   const c = useConnectivity();
   return {
     error: query.error,
@@ -56,7 +60,7 @@ export function ServicesScreen() {
         subtitle="Daily-help access and deliveries for your selected home."
         title="Services"
       />
-      <QueryState {...present(helpers)}>
+      <QueryState {...useQueryPresentation(helpers)}>
         <Section title="Daily help">
           {(helpers.data?.items.length ?? 0) === 0 ? (
             <Row
@@ -119,7 +123,7 @@ export function ParcelDetailScreen({ id }: { id: string }) {
   return (
     <Screen>
       <PageHeader title="Parcel details" />
-      <QueryState {...present(parcel)}>
+      <QueryState {...useQueryPresentation(parcel)}>
         {data ? (
           <Section>
             <Row
@@ -184,7 +188,7 @@ export function MaintenanceScreen() {
         subtitle="Payments are only recorded after verified backend processing."
         title="Maintenance"
       />
-      <QueryState {...present(charges)}>
+      <QueryState {...useQueryPresentation(charges)}>
         <Section title="Dues">
           {(charges.data?.items.length ?? 0) === 0 ? (
             <Row
@@ -271,10 +275,15 @@ export function EmergencyScreen() {
   const submit = form.handleSubmit((values) => {
     const result = emergencySchema.safeParse(values);
     if (!result.success) {
-      form.setError('details', { message: result.error.issues[0]?.message });
+      form.setError('details', {
+        message: result.error.issues[0]?.message ?? 'Invalid emergency details.',
+      });
       return;
     }
-    create.mutate(result.data);
+    create.mutate({
+      category: result.data.category,
+      ...(result.data.details ? { details: result.data.details } : {}),
+    });
   });
   return (
     <Screen>
@@ -283,7 +292,7 @@ export function EmergencyScreen() {
         title="Emergency"
       />
       <Section title="Active alerts">
-        <QueryState {...present(active)}>
+        <QueryState {...useQueryPresentation(active)}>
           {(active.data?.items.length ?? 0) === 0 ? (
             <Row
               detail="There is no active emergency alert from this home."

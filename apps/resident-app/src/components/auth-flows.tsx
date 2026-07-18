@@ -44,7 +44,9 @@ export function SignInScreen() {
   const submit = form.handleSubmit((values) => {
     const parsed = phoneSchema.safeParse(values);
     if (!parsed.success)
-      return form.setError('phone', { message: parsed.error.issues[0]?.message });
+      return form.setError('phone', {
+        message: parsed.error.issues[0]?.message ?? 'Invalid phone number.',
+      });
     mutation.mutate(parsed.data.phone);
   });
   return (
@@ -91,7 +93,10 @@ export function VerifyOtpScreen() {
   }, [pendingOtp]);
   const submit = form.handleSubmit((values) => {
     const parsed = otpSchema.safeParse(values);
-    if (!parsed.success) return form.setError('code', { message: parsed.error.issues[0]?.message });
+    if (!parsed.success)
+      return form.setError('code', {
+        message: parsed.error.issues[0]?.message ?? 'Invalid verification code.',
+      });
     mutation.mutate(parsed.data.code);
   });
   return (
@@ -146,8 +151,12 @@ export function PinScreen() {
   const submit = form.handleSubmit((values) => {
     const phone = phoneSchema.safeParse({ phone: values.phone });
     const pin = pinSchema.safeParse({ pin: values.pin });
-    if (!phone.success) return form.setError('phone', { message: phone.error.issues[0]?.message });
-    if (!pin.success) return form.setError('pin', { message: pin.error.issues[0]?.message });
+    if (!phone.success)
+      return form.setError('phone', {
+        message: phone.error.issues[0]?.message ?? 'Invalid phone number.',
+      });
+    if (!pin.success)
+      return form.setError('pin', { message: pin.error.issues[0]?.message ?? 'Invalid PIN.' });
     mutation.mutate({ phone: phone.data.phone, pin: pin.data.pin });
   });
   return (
@@ -157,7 +166,7 @@ export function PinScreen() {
           Unlock with PIN
         </Text>
         <Text style={styles.copy}>
-          PIN unlock remains subject to the server's session and device checks.
+          {"PIN unlock remains subject to the server's session and device checks."}
         </Text>
         <Controller
           control={form.control}

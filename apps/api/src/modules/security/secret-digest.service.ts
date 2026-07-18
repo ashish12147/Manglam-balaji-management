@@ -16,6 +16,34 @@ export class SecretDigestService {
     this.visitorSecret = config.get('VISITOR_CODE_HMAC_SECRET', { infer: true });
   }
 
+  authenticationOrigin(
+    deviceFingerprint: string,
+    ipAddress: string | null,
+    societyId: string,
+  ): string {
+    return secretDigest(
+      `${deviceFingerprint}\0${ipAddress ?? 'no-ip'}`,
+      ['authentication-origin', societyId],
+      this.refreshSecret,
+    );
+  }
+
+  authenticationSubject(identifier: string, method: string, societyId: string): string {
+    return secretDigest(
+      identifier,
+      ['authentication-subject', societyId, method],
+      this.refreshSecret,
+    );
+  }
+
+  credentialProof(value: string, purpose: string, societyId: string): string {
+    return secretDigest(
+      value,
+      ['credential-proof', societyId, purpose],
+      this.refreshSecret,
+    );
+  }
+
   deviceFingerprint(fingerprint: string, societyId: string): string {
     return secretDigest(fingerprint, ['device', societyId], this.refreshSecret);
   }
@@ -24,19 +52,31 @@ export class SecretDigestService {
     return secretDigest(nonce, ['device-nonce', societyId], this.otpSecret);
   }
 
-  phone(phoneE164: string, societyId: string): string {
-    return secretDigest(phoneE164, ['phone', societyId], this.otpSecret);
+  guardEnrollmentToken(token: string, societyId: string, guardDeviceId: string): string {
+    return secretDigest(
+      token,
+      ['guard-enrollment', societyId, guardDeviceId],
+      this.refreshSecret,
+    );
   }
 
-  requestIp(ipAddress: string): string {
-    return secretDigest(ipAddress, ['request-ip'], this.otpSecret);
+  phone(phoneE164: string, societyId: string): string {
+    return secretDigest(phoneE164, ['phone', societyId], this.otpSecret);
   }
 
   refreshToken(token: string, familyId: string): string {
     return secretDigest(token, ['refresh-token', familyId], this.refreshSecret);
   }
 
+  requestIp(ipAddress: string): string {
+    return secretDigest(ipAddress, ['request-ip'], this.otpSecret);
+  }
+
   visitorCode(code: string, societyId: string): string {
-    return secretDigest(code.toUpperCase(), ['visitor-code', societyId], this.visitorSecret);
+    return secretDigest(
+      code.toUpperCase(),
+      ['visitor-code', societyId],
+      this.visitorSecret,
+    );
   }
 }

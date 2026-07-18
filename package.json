@@ -4,7 +4,7 @@
   "private": true,
   "description": "Single-society resident, guard, and administration system for Manglam Balaji Society.",
   "license": "MIT",
-  "packageManager": "pnpm@11.7.0",
+  "packageManager": "pnpm@11.9.0",
   "engines": {
     "node": ">=24.0.0 <25",
     "pnpm": ">=11.0.0 <12"

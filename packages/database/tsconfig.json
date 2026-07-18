@@ -1,12 +1,17 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "noEmit": true,
+    "paths": {
+      "@manglam/permissions": ["../permissions/src/index.ts"]
+    },
     "types": ["node", "vitest/globals"]
   },
   "include": [
     "prisma.config.ts",
     "prisma/**/*.ts",
+    "scripts/**/*.ts",
     "src/**/*.ts",
     "tests/**/*.ts",
     "vitest.config.ts"

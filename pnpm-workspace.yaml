@@ -2,8 +2,15 @@ packages:
   - apps/*
   - packages/*
 
+nodeLinker: hoisted
+
 allowBuilds:
+  '@prisma/engines': true
+  '@scarf/scarf': false
   esbuild: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true
 
 catalog:
   '@types/node': 24.10.1
@@ -11,10 +18,8 @@ catalog:
   '@types/react-dom': 19.2.3
   eslint: 9.39.1
   prettier: 3.7.4
-  react: 19.2.7
-  react-dom: 19.2.7
+  react: 19.2.3
+  react-dom: 19.2.3
   typescript: 5.9.3
   vitest: 4.0.16
   zod: 4.2.1
-
-nodeLinker: hoisted

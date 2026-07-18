@@ -141,7 +141,7 @@ export function Field({
   error,
   label,
   ...props
-}: TextInputProps & { error?: string; label: string }) {
+}: TextInputProps & { error?: string | undefined; label: string }) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>

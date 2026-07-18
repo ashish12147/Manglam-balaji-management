@@ -29,7 +29,11 @@ import { useConnectivity } from '@/providers/ConnectivityProvider';
 import { colors, radius, spacing, typography } from '@/theme/tokens';
 import type { Visit } from '@/types/api';
 
-function presentation(query: { error: unknown; isLoading: boolean; refetch: () => unknown }) {
+function useQueryPresentation(query: {
+  error: unknown;
+  isLoading: boolean;
+  refetch: () => unknown;
+}) {
   const connection = useConnectivity();
   return {
     error: query.error,
@@ -67,7 +71,7 @@ export function HomeScreen() {
         }
         title={'Hello, ' + (profile?.displayName ?? 'Resident')}
       />
-      <QueryState {...presentation(approvals)}>
+      <QueryState {...useQueryPresentation(approvals)}>
         <Section title="At a glance">
           <View style={styles.summaryGrid}>
             <Summary label="Awaiting approval" value={String(approvals.data?.items.length ?? 0)} />

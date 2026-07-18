@@ -1,6 +1,7 @@
 .expo/
 coverage/
 dist/
+dist-web/
 *.jks
 *.p8
 *.p12

@@ -2,12 +2,19 @@ import { randomUUID } from 'node:crypto';
 
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DeviceStatus, IdempotencyStatus, Prisma, SessionStatus } from '@manglam/database';
+import {
+  DeviceStatus,
+  Prisma,
+  RecordStatus,
+  SessionStatus,
+  UserStatus,
+} from '@manglam/database';
 
 import { ApiError } from '../../common/http/api-error.js';
 import type { AppEnvironment } from '../../config/env.schema.js';
 import { DatabaseService } from '../../infrastructure/database/database.service.js';
 import type { AuthenticatedPrincipal } from '../access/access.types.js';
+import { decodeCursor, pageResult } from '../platform/cursor.js';
 import {
   MutationJournalService,
   type MutationActor,
@@ -17,7 +24,8 @@ import type { MutationRequestContext } from '../platform/request-context.js';
 import { AccessTokenService } from '../security/access-token.service.js';
 import { SecretDigestService } from '../security/secret-digest.service.js';
 import { digestMatches, randomOpaqueToken } from '../security/secrets.js';
-import type { AuthDeviceInput, RefreshInput } from './auth.schemas.js';
+import type { AuthDeviceInput, SessionListQuery } from './auth.schemas.js';
+import { CredentialAttemptService } from './credential-attempt.service.js';
 
 export interface SessionTokenResponse {
   readonly accessToken: string;
@@ -26,6 +34,28 @@ export interface SessionTokenResponse {
   readonly refreshTokenExpiresAt: string;
   readonly sessionId: string;
   readonly tokenType: 'Bearer';
+}
+
+export interface SessionListItem {
+  readonly absoluteExpiresAt: string;
+  readonly createdAt: string;
+  readonly current: boolean;
+  readonly device: {
+    readonly id: string;
+    readonly label: string | null;
+    readonly platform: string;
+  } | null;
+  readonly deviceName: string;
+  readonly expiresAt: string;
+  readonly id: string;
+  readonly lastSeenAt: string;
+  readonly platform: string;
+  readonly status: string;
+}
+
+export interface SessionPage {
+  readonly items: readonly SessionListItem[];
+  readonly nextCursor: string | null;
 }
 
 interface StoredFailure {
@@ -39,13 +69,21 @@ type StoredOutcome<T> =
   | { readonly data: T; readonly ok: true }
   | { readonly error: StoredFailure; readonly ok: false };
 
-interface CreateSessionInput {
+export interface CreateSessionInput {
   readonly context: MutationRequestContext;
   readonly device: AuthDeviceInput;
+  readonly devicePolicy?: 'ALLOW_ACTIVATION' | 'REQUIRE_ACTIVE_GUARD';
   readonly kind: 'RESIDENT' | 'GUARD' | 'PRIVILEGED';
   readonly societyId: string;
   readonly userId: string;
 }
+
+interface RotateSessionInput {
+  readonly deviceFingerprint: string;
+  readonly refreshToken: string;
+}
+
+const SESSION_IDLE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 @Injectable()
 export class SessionService {
@@ -53,10 +91,11 @@ export class SessionService {
 
   constructor(
     private readonly database: DatabaseService,
-    private readonly config: ConfigService<AppEnvironment, true>,
+    config: ConfigService<AppEnvironment, true>,
     private readonly digests: SecretDigestService,
     private readonly journal: MutationJournalService,
     private readonly accessTokens: AccessTokenService,
+    private readonly attempts: CredentialAttemptService,
   ) {
     this.refreshTtlSeconds = config.get('REFRESH_TOKEN_TTL_SECONDS', {
       infer: true,
@@ -73,14 +112,32 @@ export class SessionService {
       input.societyId,
     );
     const existingDevice = await transaction.device.findFirst({
+      include: { guardDevice: true },
       where: { fingerprintDigest, societyId: input.societyId },
     });
     if (
       existingDevice &&
-      ((existingDevice.userId !== null && existingDevice.userId !== input.userId) ||
-        [DeviceStatus.REVOKED, DeviceStatus.LOST].includes(existingDevice.status))
+      (existingDevice.userId !== null && existingDevice.userId !== input.userId)
     ) {
       throw authenticationFailure();
+    }
+    if (
+      existingDevice &&
+      [DeviceStatus.REVOKED, DeviceStatus.LOST].includes(existingDevice.status)
+    ) {
+      throw authenticationFailure();
+    }
+
+    const guardPolicy =
+      input.devicePolicy === 'REQUIRE_ACTIVE_GUARD' || input.kind === 'GUARD';
+    if (
+      guardPolicy &&
+      (!existingDevice ||
+        existingDevice.status !== DeviceStatus.ACTIVE ||
+        existingDevice.userId !== input.userId ||
+        existingDevice.guardDevice?.status !== DeviceStatus.ACTIVE)
+    ) {
+      throw enrollmentRequired();
     }
 
     const device = existingDevice
@@ -91,8 +148,9 @@ export class SessionService {
             lastSeenAt: now,
             operatingSystem: input.device.operatingSystem ?? null,
             platform: input.device.platform,
-            status: DeviceStatus.ACTIVE,
-            userId: input.userId,
+            ...(guardPolicy
+              ? {}
+              : { status: DeviceStatus.ACTIVE, userId: input.userId }),
             version: { increment: 1 },
           },
           where: { id: existingDevice.id },
@@ -114,14 +172,18 @@ export class SessionService {
     const familyId = randomUUID();
     const sessionId = randomUUID();
     const refreshToken = `${familyId}.${randomOpaqueToken(48)}`;
-    const refreshExpiresAt = new Date(now.getTime() + this.refreshTtlSeconds * 1_000);
+    const refreshExpiresAt = new Date(
+      now.getTime() + this.refreshTtlSeconds * 1_000,
+    );
     const idleExpiresAt = new Date(
-      now.getTime() + Math.min(this.refreshTtlSeconds, 7 * 24 * 60 * 60) * 1_000,
+      now.getTime() +
+        Math.min(this.refreshTtlSeconds, SESSION_IDLE_TTL_SECONDS) * 1_000,
     );
     await transaction.userSession.create({
       data: {
         absoluteExpiresAt: refreshExpiresAt,
         deviceId: device.id,
+        id: sessionId,
         idleExpiresAt,
         ipAddress: input.context.ipAddress,
         kind: input.kind,
@@ -132,7 +194,6 @@ export class SessionService {
           ? this.journal.hashRequest(input.context.userAgent)
           : null,
         userId: input.userId,
-        id: sessionId,
       },
     });
     await transaction.refreshToken.create({
@@ -168,88 +229,131 @@ export class SessionService {
   }
 
   async rotate(
-    input: RefreshInput,
+    input: RotateSessionInput,
     context: MutationRequestContext,
   ): Promise<SessionTokenResponse> {
-    const familyId = input.refreshToken.split('.', 1)[0];
-    if (!familyId || !/^[0-9a-f-]{36}$/i.test(familyId)) {
-      throw authenticationFailure();
-    }
-    const digest = this.digests.refreshToken(input.refreshToken, familyId);
-    const located = await this.database.client.refreshToken.findUnique({
-      include: { session: { include: { device: true, user: true } } },
-      where: { tokenDigest: digest },
+    const societyId = await this.activeSocietyId();
+    const familyId = parseRefreshFamily(input.refreshToken);
+    const rawTokenDigest = this.journal.hashRequest(input.refreshToken);
+    const attemptKeys = this.attempts.keys({
+      deviceFingerprint: input.deviceFingerprint,
+      identifier: familyId ?? rawTokenDigest,
+      ipAddress: context.ipAddress,
+      method: 'REFRESH_TOKEN',
+      societyId,
     });
-    if (!located?.session.device) {
-      throw authenticationFailure();
-    }
+    const tokenDigest = familyId
+      ? this.digests.refreshToken(input.refreshToken, familyId)
+      : null;
+    const located = tokenDigest
+      ? await this.database.client.refreshToken.findFirst({
+          include: { session: { include: { device: true } } },
+          where: { societyId, tokenDigest },
+        })
+      : null;
+    const operationId = located?.sessionId ?? randomUUID();
+    const actor: MutationActor = located
+      ? {
+          actorScopeKey: `session:${located.sessionId}`,
+          deviceId: located.session.device?.id ?? null,
+          sessionId: located.sessionId,
+          userId: located.session.userId,
+        }
+      : { actorScopeKey: `refresh:${attemptKeys.subjectDigest}` };
 
-    const actor: MutationActor = {
-      actorScopeKey: `session:${located.sessionId}`,
-      deviceId: located.session.device.id,
-      sessionId: located.sessionId,
-      userId: located.session.userId,
-    };
     const outcome = await this.database.client.$transaction(
       async (transaction) => {
-        const claim = await this.journal.begin<StoredOutcome<SessionTokenResponse>>(transaction, {
-          actor,
-          idempotencyKey: context.idempotencyKey,
-          operation: 'auth.session.rotate',
-          request: {
-            deviceFingerprintDigest: this.digests.deviceFingerprint(
-              input.deviceFingerprint,
-              located.societyId,
-            ),
-            refreshTokenDigest: digest,
-          },
-          societyId: located.societyId,
-        });
-        if (claim.kind === 'replay') {
-          return claim.response;
-        }
-
-        const token = await transaction.refreshToken.findUnique({
-          include: { session: { include: { device: true, user: true } } },
-          where: { tokenDigest: digest },
-        });
-        if (!token?.session.device) {
-          return this.commitFailure(transaction, {
+        const claim = await this.journal.begin<StoredOutcome<SessionTokenResponse>>(
+          transaction,
+          {
             actor,
+            idempotencyKey: context.idempotencyKey,
+            operation: 'auth.session.rotate',
+            request: {
+              deviceFingerprintDigest: this.digests.deviceFingerprint(
+                input.deviceFingerprint,
+                societyId,
+              ),
+              refreshTokenDigest: rawTokenDigest,
+            },
+            societyId,
+          },
+        );
+        if (claim.kind === 'replay') return claim.response;
+
+        const allowed = await this.attempts.allowed(transaction, {
+          ...attemptKeys,
+          method: 'REFRESH_TOKEN',
+          societyId,
+        });
+        if (!allowed) {
+          return this.commitRefreshFailure(transaction, {
+            actor,
+            attemptKeys,
             claimId: claim.recordId,
             context,
-            familyId,
-            societyId: located.societyId,
-            sessionId: located.sessionId,
+            failureCode: 'AUTHENTICATION_RATE_LIMITED',
+            operationId,
+            outcome: 'BLOCKED',
+            societyId,
           });
         }
 
-        const fingerprint = this.digests.deviceFingerprint(
-          input.deviceFingerprint,
-          token.societyId,
-        );
-        const validDevice = digestMatches(fingerprint, token.session.device.fingerprintDigest);
-        const active =
-          token.status === SessionStatus.ACTIVE &&
-          token.consumedAt === null &&
-          token.expiresAt > new Date() &&
-          token.session.status === SessionStatus.ACTIVE &&
-          token.session.absoluteExpiresAt > new Date() &&
-          token.session.idleExpiresAt > new Date() &&
-          token.session.device.status === DeviceStatus.ACTIVE;
-        if (!active || !validDevice) {
-          return this.commitFailure(transaction, {
+        const token = tokenDigest
+          ? await transaction.refreshToken.findFirst({
+              include: { session: { include: { device: true, user: true } } },
+              where: { societyId, tokenDigest },
+            })
+          : null;
+        if (!token?.session.device) {
+          return this.commitRefreshFailure(transaction, {
             actor,
+            attemptKeys,
             claimId: claim.recordId,
             context,
+            failureCode: 'SESSION_EXPIRED',
+            operationId,
+            outcome: 'FAILURE',
+            societyId,
+          });
+        }
+
+        const now = new Date();
+        const fingerprintDigest = this.digests.deviceFingerprint(
+          input.deviceFingerprint,
+          societyId,
+        );
+        const fingerprintMatches = digestMatches(
+          fingerprintDigest,
+          token.session.device.fingerprintDigest,
+        );
+        const replayed =
+          token.status !== SessionStatus.ACTIVE || token.consumedAt !== null;
+        const active =
+          token.expiresAt > now &&
+          token.session.status === SessionStatus.ACTIVE &&
+          token.session.absoluteExpiresAt > now &&
+          token.session.idleExpiresAt > now &&
+          token.session.device.status === DeviceStatus.ACTIVE &&
+          token.session.user.status === UserStatus.ACTIVE;
+        if (replayed || !fingerprintMatches || !active) {
+          return this.commitRefreshFailure(transaction, {
+            actor,
+            attemptKeys,
+            claimId: claim.recordId,
+            compromise: replayed || !fingerprintMatches,
+            context,
+            failureCode: replayed || !fingerprintMatches ? 'SESSION_COMPROMISED' : 'SESSION_EXPIRED',
             familyId: token.familyId,
-            societyId: token.societyId,
+            operationId: token.sessionId,
+            outcome: 'FAILURE',
             sessionId: token.sessionId,
+            societyId,
           });
         }
 
         const consumed = await transaction.refreshToken.updateMany({
-          data: { consumedAt: new Date(), status: SessionStatus.REVOKED },
+          data: { consumedAt: now, status: SessionStatus.REVOKED },
           where: {
             consumedAt: null,
             id: token.id,
@@ -257,13 +361,18 @@ export class SessionService {
           },
         });
         if (consumed.count !== 1) {
-          return this.commitFailure(transaction, {
+          return this.commitRefreshFailure(transaction, {
             actor,
+            attemptKeys,
             claimId: claim.recordId,
+            compromise: true,
             context,
+            failureCode: 'SESSION_COMPROMISED',
             familyId: token.familyId,
-            societyId: token.societyId,
+            operationId: token.sessionId,
+            outcome: 'FAILURE',
             sessionId: token.sessionId,
+            societyId,
           });
         }
 
@@ -271,7 +380,7 @@ export class SessionService {
         const refreshExpiresAt = new Date(
           Math.min(
             token.session.absoluteExpiresAt.getTime(),
-            Date.now() + this.refreshTtlSeconds * 1_000,
+            now.getTime() + this.refreshTtlSeconds * 1_000,
           ),
         );
         await transaction.refreshToken.create({
@@ -280,7 +389,7 @@ export class SessionService {
             familyId: token.familyId,
             parentTokenId: token.id,
             sessionId: token.sessionId,
-            societyId: token.societyId,
+            societyId,
             status: SessionStatus.ACTIVE,
             tokenDigest: this.digests.refreshToken(newRawToken, token.familyId),
           },
@@ -290,10 +399,10 @@ export class SessionService {
             idleExpiresAt: new Date(
               Math.min(
                 token.session.absoluteExpiresAt.getTime(),
-                Date.now() + 7 * 24 * 60 * 60_000,
+                now.getTime() + SESSION_IDLE_TTL_SECONDS * 1_000,
               ),
             ),
-            lastSeenAt: new Date(),
+            lastSeenAt: now,
           },
           where: { id: token.sessionId },
         });
@@ -301,7 +410,7 @@ export class SessionService {
           deviceId: token.session.device.id,
           kind: token.session.kind,
           sessionId: token.sessionId,
-          societyId: token.societyId,
+          societyId,
           userId: token.session.userId,
         });
         const response: SessionTokenResponse = {
@@ -312,7 +421,16 @@ export class SessionService {
           sessionId: token.sessionId,
           tokenType: 'Bearer',
         };
-        const stored: StoredOutcome<SessionTokenResponse> = { data: response, ok: true };
+        const stored: StoredOutcome<SessionTokenResponse> = {
+          data: response,
+          ok: true,
+        };
+        await this.attempts.record(transaction, {
+          ...attemptKeys,
+          method: 'REFRESH_TOKEN',
+          outcome: 'SUCCESS',
+          societyId,
+        });
         await this.journal.commit(transaction, {
           action: 'auth.session.rotate',
           actor,
@@ -327,7 +445,7 @@ export class SessionService {
           newValues: { refreshTokenIdRotatedFrom: token.id },
           response: stored,
           responseStatus: HttpStatus.OK,
-          societyId: token.societyId,
+          societyId,
         });
         return stored;
       },
@@ -337,11 +455,16 @@ export class SessionService {
     return unwrapOutcome(outcome);
   }
 
-  async logout(
+  logout(
     principal: AuthenticatedPrincipal,
     context: MutationRequestContext,
   ): Promise<{ readonly revoked: true }> {
-    return this.revokeSession(principal, principal.sessionId, 'User logout', context);
+    return this.revokeSession(
+      principal,
+      principal.sessionId,
+      'User logout',
+      context,
+    );
   }
 
   async revokeSession(
@@ -353,16 +476,17 @@ export class SessionService {
     const actor = principalActor(principal);
     return this.database.client.$transaction(
       async (transaction) => {
-        const claim = await this.journal.begin<{ readonly revoked: true }>(transaction, {
-          actor,
-          idempotencyKey: context.idempotencyKey,
-          operation: 'auth.session.revoke',
-          request: { reason, sessionId },
-          societyId: principal.societyId,
-        });
-        if (claim.kind === 'replay') {
-          return claim.response;
-        }
+        const claim = await this.journal.begin<{ readonly revoked: true }>(
+          transaction,
+          {
+            actor,
+            idempotencyKey: context.idempotencyKey,
+            operation: 'auth.session.revoke',
+            request: { reason, sessionId },
+            societyId: principal.societyId,
+          },
+        );
+        if (claim.kind === 'replay') return claim.response;
 
         const session = await transaction.userSession.findFirst({
           where: {
@@ -371,19 +495,19 @@ export class SessionService {
             userId: principal.user.id,
           },
         });
-        if (!session) {
-          throw resourceNotFound();
-        }
+        if (!session) throw resourceNotFound();
+
+        const now = new Date();
         await transaction.userSession.updateMany({
           data: {
-            revokedAt: new Date(),
+            revokedAt: now,
             revocationReason: reason,
             status: SessionStatus.REVOKED,
           },
           where: { id: session.id, status: SessionStatus.ACTIVE },
         });
         await transaction.refreshToken.updateMany({
-          data: { revokedAt: new Date(), status: SessionStatus.REVOKED },
+          data: { revokedAt: now, status: SessionStatus.REVOKED },
           where: { sessionId: session.id, status: SessionStatus.ACTIVE },
         });
         const response = { revoked: true as const };
@@ -411,76 +535,167 @@ export class SessionService {
     );
   }
 
-  async list(principal: AuthenticatedPrincipal): Promise<readonly object[]> {
-    const sessions = await this.database.client.userSession.findMany({
+  async list(
+    principal: AuthenticatedPrincipal,
+    query: SessionListQuery,
+  ): Promise<SessionPage> {
+    const cursor = decodeCursor(query.cursor);
+    const cursorWhere: Prisma.UserSessionWhereInput | undefined = cursor
+      ? {
+          OR: [
+            { createdAt: { lt: new Date(cursor.at) } },
+            { createdAt: new Date(cursor.at), id: { lt: cursor.id } },
+          ],
+        }
+      : undefined;
+    const rows = await this.database.client.userSession.findMany({
       include: { device: true },
-      orderBy: { createdAt: 'desc' },
-      where: { societyId: principal.societyId, userId: principal.user.id },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: query.limit + 1,
+      where: {
+        societyId: principal.societyId,
+        userId: principal.user.id,
+        ...(cursorWhere ?? {}),
+      },
     });
-    return sessions.map((session) => ({
-      absoluteExpiresAt: session.absoluteExpiresAt.toISOString(),
-      createdAt: session.createdAt.toISOString(),
-      current: session.id === principal.sessionId,
-      device: session.device
-        ? {
-            id: session.device.id,
-            label: session.device.label,
-            platform: session.device.platform,
-          }
-        : null,
-      id: session.id,
-      lastSeenAt: session.lastSeenAt.toISOString(),
-      status: session.status,
-    }));
+    const page = pageResult(rows, query.limit);
+    return {
+      items: page.items.map((session) => {
+        const platform = session.device?.platform ?? 'UNKNOWN';
+        const deviceName = session.device?.label ?? `${platform} device`;
+        return {
+          absoluteExpiresAt: session.absoluteExpiresAt.toISOString(),
+          createdAt: session.createdAt.toISOString(),
+          current: session.id === principal.sessionId,
+          device: session.device
+            ? {
+                id: session.device.id,
+                label: session.device.label,
+                platform,
+              }
+            : null,
+          deviceName,
+          expiresAt: session.absoluteExpiresAt.toISOString(),
+          id: session.id,
+          lastSeenAt: session.lastSeenAt.toISOString(),
+          platform,
+          status: session.status,
+        };
+      }),
+      nextCursor: page.nextCursor,
+    };
   }
 
-  private async commitFailure(
+  private async activeSocietyId(): Promise<string> {
+    const society = await this.database.client.society.findFirst({
+      select: { id: true },
+      where: { singletonKey: 'MANGLAM_BALAJI', status: RecordStatus.ACTIVE },
+    });
+    if (!society) {
+      throw new ApiError({
+        code: 'SERVICE_UNAVAILABLE',
+        details: {},
+        message: 'Authentication is not available.',
+        status: HttpStatus.SERVICE_UNAVAILABLE,
+      });
+    }
+    return society.id;
+  }
+
+  private async commitRefreshFailure(
     transaction: TransactionClient,
     input: {
       readonly actor: MutationActor;
+      readonly attemptKeys: {
+        readonly originDigest: string | null;
+        readonly subjectDigest: string;
+      };
       readonly claimId: string;
+      readonly compromise?: boolean;
       readonly context: MutationRequestContext;
-      readonly familyId: string;
-      readonly sessionId: string;
+      readonly failureCode: string;
+      readonly familyId?: string;
+      readonly operationId: string;
+      readonly outcome: 'BLOCKED' | 'FAILURE';
+      readonly sessionId?: string;
       readonly societyId: string;
     },
   ): Promise<StoredOutcome<SessionTokenResponse>> {
-    await transaction.userSession.updateMany({
-      data: {
-        revokedAt: new Date(),
-        revocationReason: 'Refresh token reuse or device mismatch detected',
-        status: SessionStatus.COMPROMISED,
-      },
-      where: { id: input.sessionId },
-    });
-    await transaction.refreshToken.updateMany({
-      data: { revokedAt: new Date(), status: SessionStatus.COMPROMISED },
-      where: { familyId: input.familyId },
+    const now = new Date();
+    if (input.sessionId && input.familyId) {
+      const status = input.compromise
+        ? SessionStatus.COMPROMISED
+        : SessionStatus.EXPIRED;
+      await transaction.userSession.updateMany({
+        data: {
+          revokedAt: now,
+          revocationReason: input.compromise
+            ? 'Refresh token reuse or device mismatch detected'
+            : 'Session expired',
+          status,
+        },
+        where: { id: input.sessionId, societyId: input.societyId },
+      });
+      await transaction.refreshToken.updateMany({
+        data: { revokedAt: now, status },
+        where: { familyId: input.familyId, societyId: input.societyId },
+      });
+    }
+
+    await this.attempts.record(transaction, {
+      ...input.attemptKeys,
+      failureCode: input.failureCode,
+      method: 'REFRESH_TOKEN',
+      outcome: input.outcome,
+      societyId: input.societyId,
     });
     const stored: StoredOutcome<SessionTokenResponse> = {
       error: {
-        code: 'SESSION_EXPIRED',
+        code:
+          input.outcome === 'BLOCKED'
+            ? 'AUTHENTICATION_RATE_LIMITED'
+            : 'SESSION_EXPIRED',
         details: {},
-        message: 'The session is no longer valid.',
-        status: HttpStatus.UNAUTHORIZED,
+        message:
+          input.outcome === 'BLOCKED'
+            ? 'Too many authentication attempts. Try again later.'
+            : 'The session is no longer valid.',
+        status:
+          input.outcome === 'BLOCKED'
+            ? HttpStatus.TOO_MANY_REQUESTS
+            : HttpStatus.UNAUTHORIZED,
       },
       ok: false,
     };
     await this.journal.commit(transaction, {
-      action: 'auth.session.compromise',
+      action: input.compromise
+        ? 'auth.session.compromise'
+        : 'auth.session.rotate_failed',
       actor: input.actor,
-      aggregateId: input.sessionId,
+      aggregateId: input.operationId,
       aggregateType: 'UserSession',
+      auditOutcome: 'FAILURE',
       correlationId: input.context.databaseCorrelationId,
-      entityId: input.sessionId,
+      entityId: input.sessionId ?? null,
       entityType: 'UserSession',
-      eventType: 'auth.session.compromised',
+      eventType: input.compromise
+        ? 'auth.session.compromised'
+        : 'auth.session.rotation_failed',
       idempotencyRecordId: input.claimId,
-      metadata: { ipAddress: input.context.ipAddress },
-      newValues: { status: SessionStatus.COMPROMISED },
-      reason: 'Refresh token reuse or device mismatch detected',
+      metadata: {
+        failureCode: input.failureCode,
+        ipAddress: input.context.ipAddress,
+      },
+      newValues: input.sessionId
+        ? {
+            status: input.compromise
+              ? SessionStatus.COMPROMISED
+              : SessionStatus.EXPIRED,
+          }
+        : undefined,
+      reason: input.failureCode,
       response: stored,
-      responseStatus: HttpStatus.UNAUTHORIZED,
+      responseStatus: stored.error.status,
       societyId: input.societyId,
     });
     return stored;
@@ -497,10 +712,20 @@ export function principalActor(principal: AuthenticatedPrincipal): MutationActor
   };
 }
 
+function parseRefreshFamily(token: string): string | null {
+  if (token.length < 64 || token.length > 512) return null;
+  const separator = token.indexOf('.');
+  if (separator !== 36 || token.indexOf('.', separator + 1) !== -1) return null;
+  const familyId = token.slice(0, separator);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    familyId,
+  )
+    ? familyId
+    : null;
+}
+
 function unwrapOutcome<T>(outcome: StoredOutcome<T>): T {
-  if (outcome.ok) {
-    return outcome.data;
-  }
+  if (outcome.ok) return outcome.data;
   throw new ApiError(outcome.error);
 }
 
@@ -510,6 +735,15 @@ function authenticationFailure(): ApiError {
     details: {},
     message: 'The supplied credentials or session are invalid.',
     status: HttpStatus.UNAUTHORIZED,
+  });
+}
+
+function enrollmentRequired(): ApiError {
+  return new ApiError({
+    code: 'DEVICE_ENROLLMENT_REQUIRED',
+    details: {},
+    message: 'This guard device must be enrolled before it can sign in.',
+    status: HttpStatus.FORBIDDEN,
   });
 }
 
