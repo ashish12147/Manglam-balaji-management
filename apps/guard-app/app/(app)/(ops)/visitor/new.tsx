@@ -1,4 +1,3 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import * as Crypto from "expo-crypto";
 import { CheckCircle2, Save, Send, ShieldAlert } from "lucide-react-native";
 import { Controller, useForm } from "react-hook-form";
@@ -20,6 +19,7 @@ import { useConnectivity } from "@/connectivity/connectivity-context";
 import { useSync } from "@/offline/sync-context";
 import { colors, radii, spacing, typography } from "@/theme/tokens";
 import type { FlatDirectoryItem, VisitorCategory } from "@/types/domain";
+import { zodFormResolver } from "@/utils/zod-form-resolver";
 
 const schema = z.object({
   category: z.enum(["GUEST", "DELIVERY", "CAB", "SERVICE_PROVIDER", "OTHER"]),
@@ -67,7 +67,7 @@ export default function NewVisitorScreen() {
       purpose: "",
       vehicleNumber: ""
     },
-    resolver: zodResolver(schema)
+    resolver: zodFormResolver(schema)
   });
 
   const canManualOffline =

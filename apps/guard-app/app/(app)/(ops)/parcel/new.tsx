@@ -1,4 +1,3 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import * as Crypto from "expo-crypto";
 import { PackagePlus, WifiOff } from "lucide-react-native";
 import { Controller, useForm } from "react-hook-form";
@@ -18,6 +17,7 @@ import { PageTitle } from "@/components/Typography";
 import { useConnectivity } from "@/connectivity/connectivity-context";
 import { colors, typography } from "@/theme/tokens";
 import type { FlatDirectoryItem } from "@/types/domain";
+import { zodFormResolver } from "@/utils/zod-form-resolver";
 
 const schema = z.object({
   courierName: z.string().trim().max(100),
@@ -36,7 +36,7 @@ export default function NewParcelScreen() {
     formState: { errors, isSubmitting }
   } = useForm<z.infer<typeof schema>>({
     defaultValues: { courierName: "", description: "" },
-    resolver: zodResolver(schema)
+    resolver: zodFormResolver(schema)
   });
 
   const submit = handleSubmit(async (values) => {

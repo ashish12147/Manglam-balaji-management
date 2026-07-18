@@ -1,6 +1,11 @@
 import * as Crypto from "expo-crypto";
 
 import { ApiError, type ApiErrorBody } from "@/api/errors";
+import {
+  idempotencyKeyForRetry,
+  releaseIdempotencyKey,
+  retainIdempotencyKey
+} from "@/api/idempotency-retry";
 import { deviceFingerprintHeaders, protectedIdentityHeaders } from "@/api/request-contract";
 import { isDefinitiveRefreshFailure } from "@/auth/refresh-credentials";
 import { env } from "@/config/env";
@@ -68,6 +73,17 @@ function makeUrl(path: string, query?: ApiRequestOptions["query"]): string {
     }
   }
   return url.toString();
+}
+
+async function idempotencyFingerprint(
+  method: string,
+  url: string,
+  serializedBody: string | undefined
+): Promise<string> {
+  return Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    `${method}\u0000${url}\u0000${serializedBody ?? ""}`
+  );
 }
 
 async function parseBody(response: Response): Promise<unknown> {
@@ -172,6 +188,15 @@ async function performRequest<T>(
 ): Promise<T> {
   const authRequired = options.auth !== false;
   const context = await authAdapter.getContext();
+  const method = options.method ?? (options.body === undefined ? "GET" : "POST");
+  const url = makeUrl(path, options.query);
+  const serializedBody = options.body === undefined ? undefined : JSON.stringify(options.body);
+  const fingerprint = options.idempotencyKey
+    ? await idempotencyFingerprint(method, url, serializedBody)
+    : null;
+  const effectiveIdempotencyKey = fingerprint && options.idempotencyKey
+    ? idempotencyKeyForRetry(fingerprint, options.idempotencyKey)
+    : options.idempotencyKey;
   let identityHeaders: Record<string, string> = {};
   if (authRequired) {
     try {
@@ -192,31 +217,42 @@ async function performRequest<T>(
   else options.signal?.addEventListener("abort", externalAbort, { once: true });
 
   try {
-    const response = await fetch(makeUrl(path, options.query), {
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    const response = await fetch(url, {
+      body: serializedBody,
       headers: {
+        ...options.headers,
         Accept: "application/json",
         ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
         "X-Correlation-ID": Crypto.randomUUID(),
         ...identityHeaders,
-        ...(options.idempotencyKey ? { "Idempotency-Key": options.idempotencyKey } : {}),
-        ...options.headers
+        ...(effectiveIdempotencyKey ? { "Idempotency-Key": effectiveIdempotencyKey } : {})
       },
-      method: options.method ?? (options.body === undefined ? "GET" : "POST"),
+      method,
       signal: controller.signal
     });
 
-    if (response.status === 401 && authRequired && !hasRetriedAfterRefresh) {
-      await rotateTokens();
-      return performRequest(path, options, true);
+    if (response.status === 401 && authRequired) {
+      if (!hasRetriedAfterRefresh) {
+        await rotateTokens();
+        return performRequest(path, options, true);
+      }
+      await authAdapter.onSessionExpired();
     }
 
     const body = await parseBody(response);
+    if (fingerprint) {
+      const errorCode = (body as ApiErrorBody)?.error?.code;
+      if (response.status === 409 && errorCode === "IDEMPOTENCY_REQUEST_IN_PROGRESS")
+        retainIdempotencyKey(fingerprint, effectiveIdempotencyKey!);
+      else releaseIdempotencyKey(fingerprint);
+    }
     if (!response.ok) throw toApiError(response, body);
     return unwrap<T>(body);
   } catch (error) {
     if (error instanceof ApiError) throw error;
     const aborted = error instanceof Error && error.name === "AbortError";
+    if (fingerprint && effectiveIdempotencyKey)
+      retainIdempotencyKey(fingerprint, effectiveIdempotencyKey);
     throw new ApiError({
       code: aborted ? "REQUEST_TIMEOUT" : "NETWORK_UNAVAILABLE",
       details: error,

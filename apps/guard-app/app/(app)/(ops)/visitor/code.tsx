@@ -1,4 +1,3 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import * as Crypto from "expo-crypto";
 import { Controller, useForm } from "react-hook-form";
 import { ScanLine } from "lucide-react-native";
@@ -13,6 +12,7 @@ import { StatePanel } from "@/components/StatePanel";
 import { PageTitle } from "@/components/Typography";
 import { useConnectivity } from "@/connectivity/connectivity-context";
 import { colors, typography } from "@/theme/tokens";
+import { zodFormResolver } from "@/utils/zod-form-resolver";
 
 const schema = z.object({
   code: z.string().trim().min(6, "Enter the visitor code.").max(128, "The code is too long.")
@@ -26,7 +26,7 @@ export default function VisitorCodeScreen() {
     handleSubmit,
     setError,
     formState: { errors, isSubmitting }
-  } = useForm<z.infer<typeof schema>>({ defaultValues: { code: "" }, resolver: zodResolver(schema) });
+  } = useForm<z.infer<typeof schema>>({ defaultValues: { code: "" }, resolver: zodFormResolver(schema) });
   if (!connectivity.isOnline) {
     return (
       <Screen>

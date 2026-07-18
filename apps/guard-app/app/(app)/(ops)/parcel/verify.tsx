@@ -1,4 +1,3 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import * as Crypto from "expo-crypto";
 import { Controller, useForm } from "react-hook-form";
 import { PackageCheck } from "lucide-react-native";
@@ -13,6 +12,7 @@ import { StatePanel } from "@/components/StatePanel";
 import { PageTitle } from "@/components/Typography";
 import { useConnectivity } from "@/connectivity/connectivity-context";
 import { colors, typography } from "@/theme/tokens";
+import { zodFormResolver } from "@/utils/zod-form-resolver";
 
 const schema = z.object({ code: z.string().trim().min(4, "Enter the collection code.").max(32) });
 
@@ -21,7 +21,7 @@ export default function ParcelVerifyScreen() {
   const connectivity = useConnectivity();
   const { control, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<z.infer<typeof schema>>({
     defaultValues: { code: "" },
-    resolver: zodResolver(schema)
+    resolver: zodFormResolver(schema)
   });
   if (!connectivity.isOnline) {
     return (

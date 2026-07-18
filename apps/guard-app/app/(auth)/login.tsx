@@ -1,4 +1,3 @@
-import { zodResolver } from "@hookform/resolvers/zod";
 import { KeyRound, LogIn, RefreshCw, ShieldCheck } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
@@ -12,6 +11,7 @@ import { ActionButton, Field } from "@/components/Controls";
 import { Screen } from "@/components/Screen";
 import { StatePanel } from "@/components/StatePanel";
 import { colors, radii, spacing, typography } from "@/theme/tokens";
+import { zodFormResolver } from "@/utils/zod-form-resolver";
 
 const schema = z.object({
   employeeCode: z.string().trim().min(2, "Enter your guard employee code.").max(40),
@@ -35,7 +35,7 @@ export default function LoginScreen() {
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
     defaultValues: { employeeCode: "", enrollmentToken: "", pin: "" },
-    resolver: zodResolver(schema)
+    resolver: zodFormResolver(schema)
   });
 
   if (session.configurationError) {
