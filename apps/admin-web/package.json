@@ -16,11 +16,11 @@
     "@hookform/resolvers": "^5.2.2",
     "@manglam/ui": "workspace:*",
     "@tanstack/react-query": "^5.90.20",
-    "lucide-react": "^0.545.0",
+    "lucide-react": "^1.25.0",
     "next": "^16.0.0",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "react-hook-form": "^7.71.1",
+    "react-hook-form": "^7.82.0",
     "zod": "catalog:"
   },
   "devDependencies": {
