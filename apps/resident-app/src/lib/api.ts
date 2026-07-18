@@ -1,6 +1,11 @@
 import * as Crypto from 'expo-crypto';
 
 import { getRuntimeConfig } from '@/lib/config';
+import {
+  idempotencyKeyForRetry,
+  releaseIdempotencyKey,
+  retainIdempotencyKey,
+} from '@/lib/idempotency-retry';
 import { getOrCreateDeviceId } from '@/lib/storage';
 
 interface ApiErrorPayload {
@@ -42,6 +47,7 @@ export class NetworkError extends Error {
 }
 
 type RefreshHandler = () => Promise<void>;
+type SessionExpiredHandler = () => Promise<void> | void;
 
 export interface ApiRequestOptions {
   auth?: boolean;
@@ -61,9 +67,9 @@ function unwrapEnvelope<T>(value: unknown): T {
   return value as T;
 }
 
-function parseError(status: number, payload: unknown): ApiError {
+function parseError(status: number, payload: unknown, responseCorrelationId: string | null): ApiError {
   const parsed = payload as ApiErrorPayload;
-  const correlationId = parsed.error?.correlationId;
+  const correlationId = parsed.error?.correlationId ?? responseCorrelationId ?? undefined;
   return new ApiError({
     code: parsed.error?.code ?? `HTTP_${status}`,
     ...(correlationId ? { correlationId } : {}),
@@ -73,11 +79,23 @@ function parseError(status: number, payload: unknown): ApiError {
   });
 }
 
+async function idempotencyFingerprint(
+  method: string,
+  url: string,
+  serializedBody: string,
+): Promise<string> {
+  return Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    `${method}\u0000${url}\u0000${serializedBody}`,
+  );
+}
+
 class ApiClient {
   private accessToken: string | null = null;
   private membershipId: string | null = null;
   private refreshHandler: RefreshHandler | null = null;
   private refreshPromise: Promise<void> | null = null;
+  private sessionExpiredHandler: SessionExpiredHandler | null = null;
 
   getAccessToken(): string | null {
     return this.accessToken;
@@ -95,9 +113,28 @@ class ApiClient {
     this.refreshHandler = handler;
   }
 
+  setSessionExpiredHandler(handler: SessionExpiredHandler | null): void {
+    this.sessionExpiredHandler = handler;
+  }
+
   async request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
     const config = getRuntimeConfig();
     const deviceId = await getOrCreateDeviceId();
+    const method = options.method ?? 'GET';
+    const url = `${config.apiUrl}${path}`;
+    const serializedBody =
+      options.body === undefined
+        ? ''
+        : options.body instanceof FormData
+          ? ''
+          : JSON.stringify(options.body);
+    const fingerprint =
+      options.idempotencyKey && !(options.body instanceof FormData)
+        ? await idempotencyFingerprint(method, url, serializedBody)
+        : null;
+    const effectiveIdempotencyKey = fingerprint && options.idempotencyKey
+      ? idempotencyKeyForRetry(fingerprint, options.idempotencyKey)
+      : options.idempotencyKey;
     const controller = new AbortController();
     let timedOut = false;
     const timeoutId = setTimeout(() => {
@@ -119,15 +156,15 @@ class ApiClient {
 
     if (auth && this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
     if (this.membershipId) headers['X-Membership-Id'] = this.membershipId;
-    if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
+    if (effectiveIdempotencyKey) headers['Idempotency-Key'] = effectiveIdempotencyKey;
 
     try {
-      const response = await fetch(`${config.apiUrl}${path}`, {
-        method: options.method ?? 'GET',
+      const response = await fetch(url, {
+        method,
         headers,
         ...(options.body !== undefined
           ? {
-              body: options.body instanceof FormData ? options.body : JSON.stringify(options.body),
+              body: options.body instanceof FormData ? options.body : serializedBody,
             }
           : {}),
         signal: controller.signal,
@@ -136,18 +173,35 @@ class ApiClient {
       const payload: unknown =
         response.status === 204 ? undefined : await response.json().catch(() => undefined);
 
-      if (response.status === 401 && auth && (options.retryAuth ?? true) && this.refreshHandler) {
-        this.refreshPromise ??= this.refreshHandler().finally(() => {
-          this.refreshPromise = null;
-        });
-        await this.refreshPromise;
-        return this.request<T>(path, { ...options, retryAuth: false });
+      if (response.status === 401 && auth) {
+        if ((options.retryAuth ?? true) && this.refreshHandler) {
+          this.refreshPromise ??= this.refreshHandler().finally(() => {
+            this.refreshPromise = null;
+          });
+          await this.refreshPromise;
+          return this.request<T>(path, { ...options, retryAuth: false });
+        }
+        await this.sessionExpiredHandler?.();
       }
 
-      if (!response.ok) throw parseError(response.status, payload);
+      if (fingerprint && effectiveIdempotencyKey) {
+        const code = (payload as ApiErrorPayload | undefined)?.error?.code;
+        if (response.status === 409 && code === 'IDEMPOTENCY_REQUEST_IN_PROGRESS') {
+          retainIdempotencyKey(fingerprint, effectiveIdempotencyKey);
+        } else {
+          releaseIdempotencyKey(fingerprint);
+        }
+      }
+
+      if (!response.ok) {
+        throw parseError(response.status, payload, response.headers.get('x-correlation-id'));
+      }
       return unwrapEnvelope<T>(payload);
     } catch (error) {
       if (error instanceof ApiError) throw error;
+      if (fingerprint && effectiveIdempotencyKey) {
+        retainIdempotencyKey(fingerprint, effectiveIdempotencyKey);
+      }
       if (error instanceof Error && error.name === 'AbortError') {
         throw new NetworkError(
           timedOut ? 'The request timed out. Please try again.' : 'The request was cancelled.',

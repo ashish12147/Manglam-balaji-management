@@ -114,8 +114,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     apiClient.setRefreshHandler(refreshSession);
-    return () => apiClient.setRefreshHandler(null);
-  }, [refreshSession]);
+    apiClient.setSessionExpiredHandler(clearSession);
+    return () => {
+      apiClient.setRefreshHandler(null);
+      apiClient.setSessionExpiredHandler(null);
+    };
+  }, [clearSession, refreshSession]);
 
   useEffect(() => {
     const recoveryTimer = setTimeout(() => {
