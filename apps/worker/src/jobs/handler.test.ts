@@ -73,7 +73,11 @@ function encrypt(value: unknown): EncryptedPayload {
 
 function event(eventType: string, payload: unknown, societyId = SOCIETY_ID): LeasedOutboxEvent {
   return {
-    aggregateId: DELIVERY_ID,
+    aggregateId: eventType.startsWith('file.')
+      ? FILE_ID
+      : eventType === 'audit.follow-up'
+        ? AUDIT_ID
+        : DELIVERY_ID,
     aggregateType: 'test',
     attemptCount: 1,
     correlationId: NOTIFICATION_ID,
@@ -249,6 +253,44 @@ describe('JobHandler tenant boundaries', () => {
     ).rejects.toThrow('aggregate does not match');
     expect(second.calls).toHaveLength(0);
   });
+
+  it('binds file, receipt, and audit targets to the leased aggregate', async () => {
+    const file = setup();
+    await expect(
+      file.handler.handle({
+        ...event('file.scan', {
+          fileId: FILE_ID,
+          objectKey: 'quarantine/file',
+          sha256Base64: SHA256_BASE64,
+          societyId: SOCIETY_ID,
+        }),
+        aggregateId: DELIVERY_ID,
+      }),
+    ).rejects.toThrow('File scan target');
+    expect(file.calls).toHaveLength(0);
+
+    const receipt = setup();
+    await expect(
+      receipt.handler.handle({
+        ...event('expo.receipt', {
+          deliveryId: DELIVERY_ID,
+          endpointId: ENDPOINT_ID,
+          ticketId: 'ticket-12345',
+        }),
+        aggregateId: FILE_ID,
+      }),
+    ).rejects.toThrow('Expo receipt delivery');
+    expect(receipt.calls).toHaveLength(0);
+
+    const audit = setup();
+    await expect(
+      audit.handler.handle({
+        ...event('audit.follow-up', { auditLogId: AUDIT_ID, societyId: SOCIETY_ID }),
+        aggregateId: DELIVERY_ID,
+      }),
+    ).rejects.toThrow('Audit follow-up target');
+    expect(audit.calls).toHaveLength(0);
+  });
 });
 
 describe('JobHandler OTP secrecy', () => {
@@ -315,6 +357,8 @@ describe('JobHandler notification delivery', () => {
     const completion = calls.find((call) => call.query.includes('receipt_event AS'));
     expect(completion?.query).toContain("NOW() + ($7::bigint * interval '1 second')");
     expect(completion?.query).toContain(', $8');
+    expect(completion?.query).toContain('correlation_id, updated_at');
+    expect(completion?.query).toContain('$8, NOW()');
     expect(completion?.values[7]).toBe(NOTIFICATION_ID);
   });
 
@@ -516,6 +560,10 @@ describe('JobHandler scanner and receipt behavior', () => {
         ticketId: 'ticket-12345',
       }),
     );
+    const lookup = calls.find(
+      (call) => call.kind === 'query' && call.query.includes('provider_message_id = $4'),
+    );
+    expect(lookup?.values).toEqual([DELIVERY_ID, SOCIETY_ID, ENDPOINT_ID, 'ticket-12345']);
     const revoke = calls.find(
       (call) => call.kind === 'execute' && call.query.includes("status = 'REVOKED'"),
     );

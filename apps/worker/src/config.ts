@@ -134,10 +134,9 @@ export const workerEnvironmentSchema = z
         path: ['PUSH_PROVIDERS'],
       });
     }
-    if (
-      !environment.DATABASE_URL.includes('sslmode=require') &&
-      !environment.DATABASE_URL.includes('sslmode=verify-')
-    ) {
+    const sslModes = new URL(environment.DATABASE_URL).searchParams.getAll('sslmode');
+    const sslMode = sslModes[0]?.toLowerCase() ?? '';
+    if (sslModes.length !== 1 || !['require', 'verify-ca', 'verify-full'].includes(sslMode)) {
       context.addIssue({
         code: 'custom',
         path: ['DATABASE_URL'],

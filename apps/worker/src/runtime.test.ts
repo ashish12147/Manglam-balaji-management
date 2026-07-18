@@ -122,4 +122,41 @@ describe('WorkerRuntime readiness and Redis acceleration', () => {
     await expect(runtime.stop()).rejects.toThrow('heartbeat failed');
     expect(redisClosed).toBe(true);
   });
+
+  it('persists DRAINING after an in-flight READY heartbeat completes', async () => {
+    const states: string[] = [];
+    let releaseHeartbeat: (() => void) | undefined;
+    const database = {
+      $executeRawUnsafe: async (_query: string, ...values: unknown[]) => {
+        const state = String(values[1]);
+        states.push(state);
+        if (states.length === 2) {
+          await new Promise<void>((resolve) => {
+            releaseHeartbeat = resolve;
+          });
+        }
+        return 1;
+      },
+      $queryRawUnsafe: async () => [],
+    } as SqlDatabase;
+    const redis = {
+      close: async () => undefined,
+      start: async () => true,
+    } as unknown as RedisAccelerator;
+    const runtime = new WorkerRuntime(database, environment, {} as JobHandler, logger, redis);
+
+    await runtime.start();
+    const inFlight = (
+      runtime as unknown as { requestHeartbeat(): Promise<void> }
+    ).requestHeartbeat();
+    await Promise.resolve();
+    const stopping = runtime.stop();
+    await Promise.resolve();
+
+    expect(states).toEqual(['READY', 'READY']);
+    releaseHeartbeat?.();
+    await inFlight;
+    await stopping;
+    expect(states).toEqual(['READY', 'READY', 'DRAINING']);
+  });
 });

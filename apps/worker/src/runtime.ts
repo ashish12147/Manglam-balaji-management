@@ -15,6 +15,7 @@ export class WorkerRuntime {
   private pollAgain = false;
   private pollHealthy = false;
   private pollPromise: Promise<void> | undefined;
+  private heartbeatPromise: Promise<void> | undefined;
   private heartbeatTimer: NodeJS.Timeout | undefined;
   private pollTimer: NodeJS.Timeout | undefined;
 
@@ -48,7 +49,7 @@ export class WorkerRuntime {
       this.environment.WORKER_POLL_INTERVAL_MS,
     );
     this.heartbeatTimer = setInterval(
-      () => void this.beat(),
+      () => void this.requestHeartbeat(),
       this.environment.WORKER_HEARTBEAT_SECONDS * 1000,
     );
   }
@@ -60,6 +61,7 @@ export class WorkerRuntime {
     if (this.pollTimer) clearInterval(this.pollTimer);
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     if (this.pollPromise) await this.pollPromise;
+    if (this.heartbeatPromise) await this.heartbeatPromise;
 
     let heartbeatError: unknown;
     try {
@@ -91,12 +93,19 @@ export class WorkerRuntime {
     return this.pollPromise;
   }
 
+  private requestHeartbeat(): Promise<void> {
+    if (this.draining) return Promise.resolve();
+    if (!this.heartbeatPromise) {
+      this.heartbeatPromise = this.beat().finally(() => {
+        this.heartbeatPromise = undefined;
+      });
+    }
+    return this.heartbeatPromise;
+  }
+
   private async beat(): Promise<void> {
     try {
-      await new WorkerHeartbeatRepository(this.database).beat(
-        this.environment.WORKER_ID,
-        this.draining ? 'DRAINING' : 'READY',
-      );
+      await new WorkerHeartbeatRepository(this.database).beat(this.environment.WORKER_ID, 'READY');
       if (!this.draining) this.heartbeatHealthy = true;
     } catch (error) {
       this.heartbeatHealthy = false;

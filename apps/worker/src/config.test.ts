@@ -56,4 +56,38 @@ describe('parseWorkerEnvironment', () => {
     expect(parsed.OTP_PROVIDER).toBe('msg91');
     expect(parsed.PUSH_PROVIDERS).toEqual(['expo']);
   });
+
+  it('requires an explicit unambiguous PostgreSQL TLS mode in production', () => {
+    const production = {
+      APP_ENV: 'production',
+      REDIS_URL: 'rediss://redis.internal:6379',
+      S3_ENDPOINT: 'https://objects.internal',
+    };
+    expect(() =>
+      parseWorkerEnvironment(
+        environment({
+          ...production,
+          DATABASE_URL:
+            'postgresql://worker:password@db.internal:5432/manglam?options=sslmode=require',
+        }),
+      ),
+    ).toThrow('Production PostgreSQL must require TLS');
+    expect(() =>
+      parseWorkerEnvironment(
+        environment({
+          ...production,
+          DATABASE_URL:
+            'postgresql://worker:password@db.internal:5432/manglam?sslmode=require&sslmode=disable',
+        }),
+      ),
+    ).toThrow('Production PostgreSQL must require TLS');
+    expect(() =>
+      parseWorkerEnvironment(
+        environment({
+          ...production,
+          DATABASE_URL: 'postgresql://worker:password@db.internal:5432/manglam?sslmode=verify-full',
+        }),
+      ),
+    ).not.toThrow();
+  });
 });

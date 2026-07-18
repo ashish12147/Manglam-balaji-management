@@ -156,6 +156,9 @@ export class JobHandler {
       case 'file.scan': {
         const payload = filePayload.parse(event.payload);
         this.assertPayloadSociety(payload.societyId, event.societyId);
+        if (payload.fileId !== event.aggregateId) {
+          throw new Error('File scan target does not match the durable aggregate.');
+        }
         return this.scanFile(event.societyId, event.correlationId, payload);
       }
       case 'file.quarantine-cleanup': {
@@ -166,8 +169,13 @@ export class JobHandler {
         }
         return this.cleanupQuarantine(event.societyId, payload);
       }
-      case 'expo.receipt':
-        return this.processExpoReceipt(event.societyId, receiptPayload.parse(event.payload));
+      case 'expo.receipt': {
+        const payload = receiptPayload.parse(event.payload);
+        if (payload.deliveryId !== event.aggregateId) {
+          throw new Error('Expo receipt delivery does not match the durable aggregate.');
+        }
+        return this.processExpoReceipt(event.societyId, payload);
+      }
       case 'visitor.approval-timeout': {
         const payload = scheduledPayload.parse(event.payload);
         this.assertPayloadSociety(payload.societyId, event.societyId);
@@ -186,6 +194,9 @@ export class JobHandler {
       case 'audit.follow-up': {
         const payload = auditPayload.parse(event.payload);
         this.assertPayloadSociety(payload.societyId, event.societyId);
+        if (payload.auditLogId !== event.aggregateId) {
+          throw new Error('Audit follow-up target does not match the durable aggregate.');
+        }
         return this.auditFollowUp(event.societyId, payload.auditLogId);
       }
       default:
@@ -339,11 +350,11 @@ export class JobHandler {
        ), receipt_event AS (
          INSERT INTO outbox_events
            (id, society_id, aggregate_type, aggregate_id, event_type, payload,
-            status, dedupe_key, available_at, correlation_id)
+            status, dedupe_key, available_at, correlation_id, updated_at)
          SELECT gen_random_uuid(), society_id, 'notification_delivery', id, 'expo.receipt',
                 jsonb_build_object('deliveryId', id, 'endpointId', $3, 'ticketId', $6),
                 'PENDING', 'expo-receipt:' || id::text,
-                NOW() + ($7::bigint * interval '1 second'), $8
+                NOW() + ($7::bigint * interval '1 second'), $8, NOW()
          FROM delivered
          WHERE $5::text = 'EXPO'
          ON CONFLICT (society_id, dedupe_key) DO NOTHING
@@ -541,7 +552,7 @@ export class JobHandler {
        ), cleanup_event AS (
          INSERT INTO outbox_events
            (id, society_id, aggregate_type, aggregate_id, event_type, payload,
-            status, dedupe_key, available_at, correlation_id)
+            status, dedupe_key, available_at, correlation_id, updated_at)
          SELECT gen_random_uuid(), society_id, 'file_upload', id,
                 'file.quarantine-cleanup',
                 jsonb_build_object(
@@ -551,7 +562,7 @@ export class JobHandler {
                   'fileId', id,
                   'objectKey', $3::text
                 ),
-                'PENDING', 'file-quarantine-cleanup:' || id::text, NOW(), $6::uuid
+                'PENDING', 'file-quarantine-cleanup:' || id::text, NOW(), $6::uuid, NOW()
          FROM promoted
          ON CONFLICT (society_id, dedupe_key) DO NOTHING
          RETURNING id
@@ -646,10 +657,12 @@ export class JobHandler {
          ON endpoint.id = delivery.push_endpoint_id
         AND endpoint.society_id = delivery.society_id
        WHERE delivery.id = $1 AND delivery.society_id = $2
-         AND endpoint.id = $3 AND endpoint.provider = 'EXPO'`,
+         AND endpoint.id = $3 AND endpoint.provider = 'EXPO'
+         AND delivery.provider_message_id = $4`,
       payload.deliveryId,
       societyId,
       payload.endpointId,
+      payload.ticketId,
     );
     if (rows.length !== 1) throw new Error('Expo delivery receipt target was not found.');
     const result = await this.ports.expoReceipts.get(payload.ticketId);

@@ -54,7 +54,7 @@ function event(
   options: { aggregateId?: string; attemptCount?: number } = {},
 ): LeasedOutboxEvent {
   return {
-    aggregateId: options.aggregateId ?? DELIVERY_ID,
+    aggregateId: options.aggregateId ?? (eventType.startsWith('file.') ? FILE_ID : DELIVERY_ID),
     aggregateType: 'test',
     attemptCount: options.attemptCount ?? 1,
     correlationId: CORRELATION_ID,
@@ -182,6 +182,7 @@ describe('notification crash recovery', () => {
     expect(completion?.query).toContain('correlation_id');
     expect(completion?.query).toContain('$8');
     expect(completion?.values[7]).toBe(CORRELATION_ID);
+    expect(completion?.query).toContain('correlation_id, updated_at');
   });
 
   it('terminally records an exhausted stale delivery instead of leaving PROCESSING', async () => {
@@ -369,6 +370,8 @@ describe('durable quarantine cleanup after promotion', () => {
     const promotion = queries.find((call) => call.query.includes('WITH promoted AS'));
     expect(promotion?.query).toContain("'file.quarantine-cleanup'");
     expect(promotion?.query).toContain('INSERT INTO outbox_events');
+    expect(promotion?.query).toContain('correlation_id, updated_at');
+    expect(promotion?.query).toContain('$6::uuid, NOW()');
     expect(promotion?.values).toEqual([
       FILE_ID,
       SOCIETY_ID,
