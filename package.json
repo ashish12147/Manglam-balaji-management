@@ -34,8 +34,8 @@
   },
   "devDependencies": {
     "@playwright/test": "1.61.1",
-    "@types/node": "24.10.1",
-    "eslint": "9.39.1",
+    "@types/node": "26.1.1",
+    "eslint": "10.8.0",
     "prettier": "3.7.4",
     "rimraf": "6.1.2",
     "turbo": "2.6.3",
