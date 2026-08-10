@@ -1,8 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import {
-  authorize,
-  type AuthorizationResource,
-} from '@manglam/permissions';
+import { authorize, type AuthorizationResource } from '@manglam/permissions';
 
 import { ApiError } from '../../common/http/api-error.js';
 import { DatabaseService } from '../../infrastructure/database/database.service.js';
@@ -58,7 +55,7 @@ export class AuthorizationService {
         action: requirement.action,
         actor: principal.actor,
         recentlyAuthenticated: principal.recentlyAuthenticated,
-        reason,
+        ...(reason === undefined ? {} : { reason }),
         resource,
       });
       if (decision.allowed) {
@@ -179,9 +176,7 @@ export class AuthorizationService {
               where: { id, societyId: principal.societyId },
             })
           : null;
-        return family
-          ? { flatId: family.flatId, societyId: family.societyId }
-          : null;
+        return family ? { flatId: family.flatId, societyId: family.societyId } : null;
       }
       case 'SESSION': {
         const session = id
@@ -190,9 +185,7 @@ export class AuthorizationService {
               where: { id, societyId: principal.societyId },
             })
           : null;
-        return session
-          ? { ownerUserId: session.userId, societyId: session.societyId }
-          : null;
+        return session ? { ownerUserId: session.userId, societyId: session.societyId } : null;
       }
     }
   }

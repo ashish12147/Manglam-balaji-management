@@ -97,7 +97,13 @@ export class SocietyService {
         }),
       update: (transaction) =>
         transaction.block.update({
-          data: { ...input, version: { increment: 1 } },
+          data: {
+            ...(input.code !== undefined ? { code: input.code } : {}),
+            ...(input.name !== undefined ? { name: input.name } : {}),
+            ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
+            ...(input.status !== undefined ? { status: input.status } : {}),
+            version: { increment: 1 },
+          },
           where: { id: blockId },
         }),
     });
@@ -163,7 +169,13 @@ export class SocietyService {
         }),
       update: (transaction) =>
         transaction.floor.update({
-          data: { ...input, version: { increment: 1 } },
+          data: {
+            ...(input.label !== undefined ? { label: input.label } : {}),
+            ...(input.number !== undefined ? { number: input.number } : {}),
+            ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
+            ...(input.status !== undefined ? { status: input.status } : {}),
+            version: { increment: 1 },
+          },
           where: { id: floorId },
         }),
     });
@@ -231,7 +243,14 @@ export class SocietyService {
         }),
       update: (transaction) =>
         transaction.flat.update({
-          data: { ...input, version: { increment: 1 } },
+          data: {
+            ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+            ...(input.intercomNumber !== undefined ? { intercomNumber: input.intercomNumber } : {}),
+            ...(input.number !== undefined ? { number: input.number } : {}),
+            ...(input.occupancyType !== undefined ? { occupancyType: input.occupancyType } : {}),
+            ...(input.status !== undefined ? { status: input.status } : {}),
+            version: { increment: 1 },
+          },
           where: { id: flatId },
         }),
     });
@@ -286,7 +305,12 @@ export class SocietyService {
         }),
       update: (transaction) =>
         transaction.gate.update({
-          data: { ...input, version: { increment: 1 } },
+          data: {
+            ...(input.code !== undefined ? { code: input.code } : {}),
+            ...(input.name !== undefined ? { name: input.name } : {}),
+            ...(input.status !== undefined ? { status: input.status } : {}),
+            version: { increment: 1 },
+          },
           where: { id: gateId },
         }),
     });
@@ -358,7 +382,7 @@ export class SocietyService {
       idempotencyRecordId: claimId,
       metadata: { ipAddress: context.ipAddress },
       newValues: input.entity as Record<string, unknown>,
-      previousValues: input.previous as Record<string, unknown> | undefined,
+      ...(input.previous ? { previousValues: input.previous as Record<string, unknown> } : {}),
       response: input.response,
       responseStatus: input.previous ? HttpStatus.OK : HttpStatus.CREATED,
       societyId: principal.societyId,

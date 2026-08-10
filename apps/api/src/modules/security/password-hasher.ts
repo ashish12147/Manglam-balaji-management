@@ -16,9 +16,11 @@ export class PasswordHasher {
 
   constructor(config: ConfigService<Record<string, string | undefined>, false>) {
     this.peppers = validateCredentialPeppers({
-      ADMIN_PASSWORD_PEPPER: config.get(CREDENTIAL_PEPPER_KEYS.ADMIN_PASSWORD),
-      GUARD_PIN_PEPPER: config.get(CREDENTIAL_PEPPER_KEYS.GUARD_PIN),
-      RESIDENT_APP_PIN_PEPPER: config.get(CREDENTIAL_PEPPER_KEYS.RESIDENT_APP_PIN),
+      ADMIN_PASSWORD_PEPPER: config.getOrThrow<string>(CREDENTIAL_PEPPER_KEYS.ADMIN_PASSWORD),
+      GUARD_PIN_PEPPER: config.getOrThrow<string>(CREDENTIAL_PEPPER_KEYS.GUARD_PIN),
+      RESIDENT_APP_PIN_PEPPER: config.getOrThrow<string>(
+        CREDENTIAL_PEPPER_KEYS.RESIDENT_APP_PIN,
+      ),
     });
   }
 

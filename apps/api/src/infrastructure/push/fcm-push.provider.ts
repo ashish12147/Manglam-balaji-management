@@ -29,13 +29,14 @@ export class FcmPushProvider implements PushNotificationProvider {
     this.projectId = config.get('FCM_PROJECT_ID', { infer: true }) ?? '';
     this.timeoutMs = config.get('PUSH_HTTP_TIMEOUT_MS', { infer: true });
     this.auth = new GoogleAuth({
-      credentials:
-        clientEmail && privateKey
-          ? {
+      ...(clientEmail && privateKey
+        ? {
+            credentials: {
               client_email: clientEmail,
               private_key: privateKey.replaceAll('\\n', '\n'),
-            }
-          : undefined,
+            },
+          }
+        : {}),
       scopes: ['https://www.googleapis.com/auth/firebase.messaging'],
     });
   }

@@ -1,0 +1,9 @@
+packages:
+  - .
+
+nodeLinker: isolated
+autoInstallPeers: false
+
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true

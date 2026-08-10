@@ -1,9 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import {
-  MembershipStatus,
-  Prisma,
-  RecordStatus,
-} from '@manglam/database';
+import { MembershipStatus, Prisma, RecordStatus } from '@manglam/database';
 import { transitionMembership } from '@manglam/domain';
 
 import { ApiError } from '../../common/http/api-error.js';
@@ -36,11 +32,7 @@ export class MembershipService {
     return this.list(principal, query, { userId: principal.user.id });
   }
 
-  listByFlat(
-    principal: AuthenticatedPrincipal,
-    flatId: string,
-    query: PageQuery,
-  ): Promise<object> {
+  listByFlat(principal: AuthenticatedPrincipal, flatId: string, query: PageQuery): Promise<object> {
     return this.list(principal, query, { flatId });
   }
 
@@ -156,7 +148,7 @@ export class MembershipService {
           actorId: principal.user.id,
           current: membership.status,
           occurredAt: new Date().toISOString(),
-          reason: input.reason,
+          ...(input.reason === undefined ? {} : { reason: input.reason }),
           target,
         });
         if (!decision.ok) {
@@ -220,7 +212,7 @@ export class MembershipService {
           idempotencyRecordId: claim.recordId,
           newValues: { status: target, version: updated.version },
           previousValues: { status: membership.status, version: membership.version },
-          reason: input.reason,
+          ...(input.reason === undefined ? {} : { reason: input.reason }),
           response: updated,
           responseStatus: HttpStatus.OK,
           societyId: principal.societyId,
@@ -327,10 +319,15 @@ export class MembershipService {
         if (!previous) throw notFound();
         const updated = await transaction.familyMember.update({
           data: {
-            ...input,
             ...(input.dateOfBirth !== undefined
               ? { dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null }
               : {}),
+            ...(input.name !== undefined ? { name: input.name } : {}),
+            ...(input.normalizedPhone !== undefined
+              ? { normalizedPhone: input.normalizedPhone }
+              : {}),
+            ...(input.notes !== undefined ? { notes: input.notes } : {}),
+            ...(input.relationship !== undefined ? { relationship: input.relationship } : {}),
             version: { increment: 1 },
           },
           where: { id: familyMemberId },

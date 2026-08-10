@@ -18,6 +18,9 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1089.0",
     "@aws-sdk/s3-request-presigner": "^3.1089.0",
+    "@manglam/domain": "workspace:*",
+    "@manglam/permissions": "workspace:*",
+    "@manglam/validation": "workspace:*",
     "@manglam/database": "workspace:*",
     "@nestjs/common": "^11.1.0",
     "@nestjs/config": "^4.0.0",

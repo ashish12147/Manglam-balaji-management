@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SignJWT, compactVerify, importPKCS8, importSPKI, jwtVerify, type KeyLike } from 'jose';
+import { SignJWT, compactVerify, importPKCS8, importSPKI, jwtVerify } from 'jose';
 import { z } from 'zod';
 
 import type { AppEnvironment } from '../../config/env.schema.js';
@@ -37,8 +37,8 @@ function normalizePem(value: string): string {
 export class AccessTokenService implements OnModuleInit {
   private readonly audience: string;
   private readonly issuer: string;
-  private readonly privateKey: Promise<KeyLike>;
-  private readonly publicKey: Promise<KeyLike>;
+  private readonly privateKey: Promise<CryptoKey>;
+  private readonly publicKey: Promise<CryptoKey>;
   private readonly ttlSeconds: number;
 
   constructor(config: ConfigService<AppEnvironment, true>) {
@@ -135,7 +135,7 @@ export class AccessTokenService implements OnModuleInit {
   }
 }
 
-function assertRsaKey(key: KeyLike): void {
+function assertRsaKey(key: CryptoKey): void {
   const algorithm = key.algorithm as RsaHashedKeyAlgorithm;
   if (
     algorithm.name !== 'RSASSA-PKCS1-v1_5' ||

@@ -1,13 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { HttpStatus, Injectable, type OnModuleInit } from '@nestjs/common';
-import {
-  AuditOutcome,
-  DeviceStatus,
-  GuardStatus,
-  Prisma,
-  UserStatus,
-} from '@manglam/database';
+import { AuditOutcome, DeviceStatus, GuardStatus, Prisma, UserStatus } from '@manglam/database';
 
 import { DatabaseService } from '../../infrastructure/database/database.service.js';
 import type { MutationActor, TransactionClient } from '../platform/mutation-journal.service.js';
@@ -47,23 +41,14 @@ export class GuardAuthService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    this.dummyHash = await this.passwords.hash(
-      `invalid-guard-${randomUUID()}`,
-      'GUARD_PIN',
-    );
+    this.dummyHash = await this.passwords.hash(`invalid-guard-${randomUUID()}`, 'GUARD_PIN');
   }
 
-  signIn(
-    input: GuardSignInInput,
-    context: MutationRequestContext,
-  ): Promise<SessionTokenResponse> {
+  signIn(input: GuardSignInInput, context: MutationRequestContext): Promise<SessionTokenResponse> {
     return this.authenticate(input, context, null);
   }
 
-  enroll(
-    input: GuardEnrollInput,
-    context: MutationRequestContext,
-  ): Promise<SessionTokenResponse> {
+  enroll(input: GuardEnrollInput, context: MutationRequestContext): Promise<SessionTokenResponse> {
     return this.authenticate(input, context, input.enrollmentToken);
   }
 
@@ -74,9 +59,7 @@ export class GuardAuthService implements OnModuleInit {
   ): Promise<SessionTokenResponse> {
     const societyId = await this.society.activeId();
     const employeeCode = input.employeeCode.trim().toUpperCase();
-    const operation = enrollmentToken
-      ? 'auth.guard.enroll'
-      : 'auth.guard.sign_in';
+    const operation = enrollmentToken ? 'auth.guard.enroll' : 'auth.guard.sign_in';
     const attemptKeys = this.attempts.keys({
       deviceFingerprint: input.device.fingerprint,
       identifier: employeeCode,
@@ -84,10 +67,7 @@ export class GuardAuthService implements OnModuleInit {
       method: 'GUARD_PIN',
       societyId,
     });
-    const deviceDigest = this.digests.deviceFingerprint(
-      input.device.fingerprint,
-      societyId,
-    );
+    const deviceDigest = this.digests.deviceFingerprint(input.device.fingerprint, societyId);
     const actor: MutationActor = {
       actorScopeKey: `guard:${attemptKeys.subjectDigest}:${deviceDigest}`.slice(0, 200),
     };
@@ -95,17 +75,9 @@ export class GuardAuthService implements OnModuleInit {
       device: { ...input.device, fingerprint: deviceDigest },
       employeeCodeDigest: attemptKeys.subjectDigest,
       enrollmentTokenProof: enrollmentToken
-        ? this.digests.credentialProof(
-            enrollmentToken,
-            'GUARD_ENROLLMENT_TOKEN',
-            societyId,
-          )
+        ? this.digests.credentialProof(enrollmentToken, 'GUARD_ENROLLMENT_TOKEN', societyId)
         : null,
-      pinProof: this.digests.credentialProof(
-        input.pin,
-        'GUARD_PIN',
-        societyId,
-      ),
+      pinProof: this.digests.credentialProof(input.pin, 'GUARD_PIN', societyId),
     };
     const prior = await this.replay.find<StoredOutcome<SessionTokenResponse>>({
       actor,
@@ -134,16 +106,13 @@ export class GuardAuthService implements OnModuleInit {
 
     const outcome = await this.database.client.$transaction(
       async (transaction) => {
-        const claim = await this.journal.begin<StoredOutcome<SessionTokenResponse>>(
-          transaction,
-          {
-            actor: { ...actor, userId: candidate?.userId ?? null },
-            idempotencyKey: context.idempotencyKey,
-            operation,
-            request: requestContract,
-            societyId,
-          },
-        );
+        const claim = await this.journal.begin<StoredOutcome<SessionTokenResponse>>(transaction, {
+          actor: { ...actor, userId: candidate?.userId ?? null },
+          idempotencyKey: context.idempotencyKey,
+          operation,
+          request: requestContract,
+          societyId,
+        });
         if (claim.kind === 'replay') return claim.response;
 
         const allowed = await this.attempts.allowed(transaction, {
@@ -199,7 +168,8 @@ export class GuardAuthService implements OnModuleInit {
         if (
           device &&
           ((device.userId !== null && device.userId !== current.userId) ||
-            [DeviceStatus.LOST, DeviceStatus.REVOKED].includes(device.status))
+            device.status === DeviceStatus.LOST ||
+            device.status === DeviceStatus.REVOKED)
         ) {
           return this.commitFailure(transaction, {
             actor: { ...actor, userId: current.userId },
@@ -305,11 +275,7 @@ export class GuardAuthService implements OnModuleInit {
   ): Promise<StoredOutcome<SessionTokenResponse>> {
     const guardDevice = input.device?.guardDevice;
     const tokenDigest = guardDevice
-      ? this.digests.guardEnrollmentToken(
-          input.enrollmentToken,
-          input.societyId,
-          guardDevice.id,
-        )
+      ? this.digests.guardEnrollmentToken(input.enrollmentToken, input.societyId, guardDevice.id)
       : null;
     const now = new Date();
     const tokenValid =
@@ -587,10 +553,7 @@ export class GuardAuthService implements OnModuleInit {
   }
 
   private async getDummyHash(): Promise<string> {
-    this.dummyHash ??= await this.passwords.hash(
-      `invalid-guard-${randomUUID()}`,
-      'GUARD_PIN',
-    );
+    this.dummyHash ??= await this.passwords.hash(`invalid-guard-${randomUUID()}`, 'GUARD_PIN');
     return this.dummyHash;
   }
 }

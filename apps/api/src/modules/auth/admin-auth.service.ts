@@ -1,12 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { HttpStatus, Injectable, type OnModuleInit } from '@nestjs/common';
-import {
-  AuditOutcome,
-  Prisma,
-  RecordStatus,
-  UserStatus,
-} from '@manglam/database';
+import { AuditOutcome, Prisma, RecordStatus, UserStatus } from '@manglam/database';
 
 import { DatabaseService } from '../../infrastructure/database/database.service.js';
 import type { MutationActor, TransactionClient } from '../platform/mutation-journal.service.js';
@@ -23,16 +18,14 @@ import {
 } from './auth-outcome.js';
 import { AuthReplayService } from './auth-replay.service.js';
 import { AuthSocietyService } from './auth-society.service.js';
-import { CredentialAttemptService, type CredentialAttemptKeys } from './credential-attempt.service.js';
+import {
+  CredentialAttemptService,
+  type CredentialAttemptKeys,
+} from './credential-attempt.service.js';
 import { DatabaseTotpMfaVerifier, type MfaVerificationResult } from './mfa-verifier.js';
 import { SessionService, type SessionTokenResponse } from './session.service.js';
 
-type AdminMfaDecision =
-  | 'INVALID'
-  | 'MISSING'
-  | 'NOT_REQUIRED'
-  | 'UNAVAILABLE'
-  | 'VERIFIED';
+type AdminMfaDecision = 'INVALID' | 'MISSING' | 'NOT_REQUIRED' | 'UNAVAILABLE' | 'VERIFIED';
 
 @Injectable()
 export class AdminAuthService implements OnModuleInit {
@@ -51,10 +44,7 @@ export class AdminAuthService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    this.dummyHash = await this.passwords.hash(
-      `invalid-admin-${randomUUID()}`,
-      'ADMIN_PASSWORD',
-    );
+    this.dummyHash = await this.passwords.hash(`invalid-admin-${randomUUID()}`, 'ADMIN_PASSWORD');
   }
 
   async signIn(
@@ -76,24 +66,15 @@ export class AdminAuthService implements OnModuleInit {
       method: 'TOTP',
       societyId,
     });
-    const deviceDigest = this.digests.deviceFingerprint(
-      input.device.fingerprint,
-      societyId,
-    );
+    const deviceDigest = this.digests.deviceFingerprint(input.device.fingerprint, societyId);
     const actor: MutationActor = {
       actorScopeKey: `admin:${attemptKeys.subjectDigest}:${deviceDigest}`.slice(0, 200),
     };
     const requestContract = {
       device: { ...input.device, fingerprint: deviceDigest },
       emailDigest: attemptKeys.subjectDigest,
-      mfaCodeDigest: input.mfaCode
-        ? this.journal.hashRequest(input.mfaCode)
-        : null,
-      passwordProof: this.digests.credentialProof(
-        input.password,
-        'ADMIN_PASSWORD',
-        societyId,
-      ),
+      mfaCodeDigest: input.mfaCode ? this.journal.hashRequest(input.mfaCode) : null,
+      passwordProof: this.digests.credentialProof(input.password, 'ADMIN_PASSWORD', societyId),
     };
     const prior = await this.replay.find<StoredOutcome<SessionTokenResponse>>({
       actor,
@@ -132,9 +113,7 @@ export class AdminAuthService implements OnModuleInit {
       'ADMIN_PASSWORD',
     );
     const eligiblePassword =
-      Boolean(candidate?.passwordHash) &&
-      candidate!.roleAssignments.length > 0 &&
-      passwordValid;
+      Boolean(candidate?.passwordHash) && candidate!.roleAssignments.length > 0 && passwordValid;
 
     let mfaDecision: AdminMfaDecision = 'NOT_REQUIRED';
     if (eligiblePassword && candidate?.mfaEnabled) {
@@ -153,16 +132,13 @@ export class AdminAuthService implements OnModuleInit {
     const operationId = candidate?.id ?? randomUUID();
     const outcome = await this.database.client.$transaction(
       async (transaction) => {
-        const claim = await this.journal.begin<StoredOutcome<SessionTokenResponse>>(
-          transaction,
-          {
-            actor: { ...actor, userId: candidate?.id ?? null },
-            idempotencyKey: context.idempotencyKey,
-            operation: 'auth.admin.sign_in',
-            request: requestContract,
-            societyId,
-          },
-        );
+        const claim = await this.journal.begin<StoredOutcome<SessionTokenResponse>>(transaction, {
+          actor: { ...actor, userId: candidate?.id ?? null },
+          idempotencyKey: context.idempotencyKey,
+          operation: 'auth.admin.sign_in',
+          request: requestContract,
+          societyId,
+        });
         if (claim.kind === 'replay') return claim.response;
 
         const passwordAttemptsAllowed = await this.attempts.allowed(transaction, {
@@ -346,7 +322,7 @@ export class AdminAuthService implements OnModuleInit {
   ): Promise<StoredOutcome<SessionTokenResponse>> {
     await this.attempts.record(transaction, {
       ...input.adminAttemptKeys,
-      failureCode: input.adminOutcome === 'SUCCESS' ? undefined : input.code,
+      ...(input.adminOutcome === 'SUCCESS' ? {} : { failureCode: input.code }),
       method: 'ADMIN_PASSWORD',
       outcome: input.adminOutcome,
       societyId: input.societyId,
@@ -389,10 +365,7 @@ export class AdminAuthService implements OnModuleInit {
   }
 
   private async getDummyHash(): Promise<string> {
-    this.dummyHash ??= await this.passwords.hash(
-      `invalid-admin-${randomUUID()}`,
-      'ADMIN_PASSWORD',
-    );
+    this.dummyHash ??= await this.passwords.hash(`invalid-admin-${randomUUID()}`, 'ADMIN_PASSWORD');
     return this.dummyHash;
   }
 }

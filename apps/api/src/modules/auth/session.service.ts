@@ -2,13 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  DeviceStatus,
-  Prisma,
-  RecordStatus,
-  SessionStatus,
-  UserStatus,
-} from '@manglam/database';
+import { DeviceStatus, Prisma, RecordStatus, SessionStatus, UserStatus } from '@manglam/database';
 
 import { ApiError } from '../../common/http/api-error.js';
 import type { AppEnvironment } from '../../config/env.schema.js';
@@ -117,19 +111,20 @@ export class SessionService {
     });
     if (
       existingDevice &&
-      (existingDevice.userId !== null && existingDevice.userId !== input.userId)
+      existingDevice.userId !== null &&
+      existingDevice.userId !== input.userId
     ) {
       throw authenticationFailure();
     }
     if (
       existingDevice &&
-      [DeviceStatus.REVOKED, DeviceStatus.LOST].includes(existingDevice.status)
+      (existingDevice.status === DeviceStatus.REVOKED ||
+        existingDevice.status === DeviceStatus.LOST)
     ) {
       throw authenticationFailure();
     }
 
-    const guardPolicy =
-      input.devicePolicy === 'REQUIRE_ACTIVE_GUARD' || input.kind === 'GUARD';
+    const guardPolicy = input.devicePolicy === 'REQUIRE_ACTIVE_GUARD' || input.kind === 'GUARD';
     if (
       guardPolicy &&
       (!existingDevice ||
@@ -148,9 +143,7 @@ export class SessionService {
             lastSeenAt: now,
             operatingSystem: input.device.operatingSystem ?? null,
             platform: input.device.platform,
-            ...(guardPolicy
-              ? {}
-              : { status: DeviceStatus.ACTIVE, userId: input.userId }),
+            ...(guardPolicy ? {} : { status: DeviceStatus.ACTIVE, userId: input.userId }),
             version: { increment: 1 },
           },
           where: { id: existingDevice.id },
@@ -172,12 +165,9 @@ export class SessionService {
     const familyId = randomUUID();
     const sessionId = randomUUID();
     const refreshToken = `${familyId}.${randomOpaqueToken(48)}`;
-    const refreshExpiresAt = new Date(
-      now.getTime() + this.refreshTtlSeconds * 1_000,
-    );
+    const refreshExpiresAt = new Date(now.getTime() + this.refreshTtlSeconds * 1_000);
     const idleExpiresAt = new Date(
-      now.getTime() +
-        Math.min(this.refreshTtlSeconds, SESSION_IDLE_TTL_SECONDS) * 1_000,
+      now.getTime() + Math.min(this.refreshTtlSeconds, SESSION_IDLE_TTL_SECONDS) * 1_000,
     );
     await transaction.userSession.create({
       data: {
@@ -242,9 +232,7 @@ export class SessionService {
       method: 'REFRESH_TOKEN',
       societyId,
     });
-    const tokenDigest = familyId
-      ? this.digests.refreshToken(input.refreshToken, familyId)
-      : null;
+    const tokenDigest = familyId ? this.digests.refreshToken(input.refreshToken, familyId) : null;
     const located = tokenDigest
       ? await this.database.client.refreshToken.findFirst({
           include: { session: { include: { device: true } } },
@@ -263,22 +251,19 @@ export class SessionService {
 
     const outcome = await this.database.client.$transaction(
       async (transaction) => {
-        const claim = await this.journal.begin<StoredOutcome<SessionTokenResponse>>(
-          transaction,
-          {
-            actor,
-            idempotencyKey: context.idempotencyKey,
-            operation: 'auth.session.rotate',
-            request: {
-              deviceFingerprintDigest: this.digests.deviceFingerprint(
-                input.deviceFingerprint,
-                societyId,
-              ),
-              refreshTokenDigest: rawTokenDigest,
-            },
-            societyId,
+        const claim = await this.journal.begin<StoredOutcome<SessionTokenResponse>>(transaction, {
+          actor,
+          idempotencyKey: context.idempotencyKey,
+          operation: 'auth.session.rotate',
+          request: {
+            deviceFingerprintDigest: this.digests.deviceFingerprint(
+              input.deviceFingerprint,
+              societyId,
+            ),
+            refreshTokenDigest: rawTokenDigest,
           },
-        );
+          societyId,
+        });
         if (claim.kind === 'replay') return claim.response;
 
         const allowed = await this.attempts.allowed(transaction, {
@@ -327,8 +312,7 @@ export class SessionService {
           fingerprintDigest,
           token.session.device.fingerprintDigest,
         );
-        const replayed =
-          token.status !== SessionStatus.ACTIVE || token.consumedAt !== null;
+        const replayed = token.status !== SessionStatus.ACTIVE || token.consumedAt !== null;
         const active =
           token.expiresAt > now &&
           token.session.status === SessionStatus.ACTIVE &&
@@ -343,7 +327,8 @@ export class SessionService {
             claimId: claim.recordId,
             compromise: replayed || !fingerprintMatches,
             context,
-            failureCode: replayed || !fingerprintMatches ? 'SESSION_COMPROMISED' : 'SESSION_EXPIRED',
+            failureCode:
+              replayed || !fingerprintMatches ? 'SESSION_COMPROMISED' : 'SESSION_EXPIRED',
             familyId: token.familyId,
             operationId: token.sessionId,
             outcome: 'FAILURE',
@@ -459,12 +444,7 @@ export class SessionService {
     principal: AuthenticatedPrincipal,
     context: MutationRequestContext,
   ): Promise<{ readonly revoked: true }> {
-    return this.revokeSession(
-      principal,
-      principal.sessionId,
-      'User logout',
-      context,
-    );
+    return this.revokeSession(principal, principal.sessionId, 'User logout', context);
   }
 
   async revokeSession(
@@ -476,16 +456,13 @@ export class SessionService {
     const actor = principalActor(principal);
     return this.database.client.$transaction(
       async (transaction) => {
-        const claim = await this.journal.begin<{ readonly revoked: true }>(
-          transaction,
-          {
-            actor,
-            idempotencyKey: context.idempotencyKey,
-            operation: 'auth.session.revoke',
-            request: { reason, sessionId },
-            societyId: principal.societyId,
-          },
-        );
+        const claim = await this.journal.begin<{ readonly revoked: true }>(transaction, {
+          actor,
+          idempotencyKey: context.idempotencyKey,
+          operation: 'auth.session.revoke',
+          request: { reason, sessionId },
+          societyId: principal.societyId,
+        });
         if (claim.kind === 'replay') return claim.response;
 
         const session = await transaction.userSession.findFirst({
@@ -535,10 +512,7 @@ export class SessionService {
     );
   }
 
-  async list(
-    principal: AuthenticatedPrincipal,
-    query: SessionListQuery,
-  ): Promise<SessionPage> {
+  async list(principal: AuthenticatedPrincipal, query: SessionListQuery): Promise<SessionPage> {
     const cursor = decodeCursor(query.cursor);
     const cursorWhere: Prisma.UserSessionWhereInput | undefined = cursor
       ? {
@@ -623,9 +597,7 @@ export class SessionService {
   ): Promise<StoredOutcome<SessionTokenResponse>> {
     const now = new Date();
     if (input.sessionId && input.familyId) {
-      const status = input.compromise
-        ? SessionStatus.COMPROMISED
-        : SessionStatus.EXPIRED;
+      const status = input.compromise ? SessionStatus.COMPROMISED : SessionStatus.EXPIRED;
       await transaction.userSession.updateMany({
         data: {
           revokedAt: now,
@@ -651,26 +623,19 @@ export class SessionService {
     });
     const stored: StoredOutcome<SessionTokenResponse> = {
       error: {
-        code:
-          input.outcome === 'BLOCKED'
-            ? 'AUTHENTICATION_RATE_LIMITED'
-            : 'SESSION_EXPIRED',
+        code: input.outcome === 'BLOCKED' ? 'AUTHENTICATION_RATE_LIMITED' : 'SESSION_EXPIRED',
         details: {},
         message:
           input.outcome === 'BLOCKED'
             ? 'Too many authentication attempts. Try again later.'
             : 'The session is no longer valid.',
         status:
-          input.outcome === 'BLOCKED'
-            ? HttpStatus.TOO_MANY_REQUESTS
-            : HttpStatus.UNAUTHORIZED,
+          input.outcome === 'BLOCKED' ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.UNAUTHORIZED,
       },
       ok: false,
     };
     await this.journal.commit(transaction, {
-      action: input.compromise
-        ? 'auth.session.compromise'
-        : 'auth.session.rotate_failed',
+      action: input.compromise ? 'auth.session.compromise' : 'auth.session.rotate_failed',
       actor: input.actor,
       aggregateId: input.operationId,
       aggregateType: 'UserSession',
@@ -678,21 +643,19 @@ export class SessionService {
       correlationId: input.context.databaseCorrelationId,
       entityId: input.sessionId ?? null,
       entityType: 'UserSession',
-      eventType: input.compromise
-        ? 'auth.session.compromised'
-        : 'auth.session.rotation_failed',
+      eventType: input.compromise ? 'auth.session.compromised' : 'auth.session.rotation_failed',
       idempotencyRecordId: input.claimId,
       metadata: {
         failureCode: input.failureCode,
         ipAddress: input.context.ipAddress,
       },
-      newValues: input.sessionId
+      ...(input.sessionId
         ? {
-            status: input.compromise
-              ? SessionStatus.COMPROMISED
-              : SessionStatus.EXPIRED,
+            newValues: {
+              status: input.compromise ? SessionStatus.COMPROMISED : SessionStatus.EXPIRED,
+            },
           }
-        : undefined,
+        : {}),
       reason: input.failureCode,
       response: stored,
       responseStatus: stored.error.status,
@@ -717,9 +680,7 @@ function parseRefreshFamily(token: string): string | null {
   const separator = token.indexOf('.');
   if (separator !== 36 || token.indexOf('.', separator + 1) !== -1) return null;
   const familyId = token.slice(0, separator);
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    familyId,
-  )
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(familyId)
     ? familyId
     : null;
 }

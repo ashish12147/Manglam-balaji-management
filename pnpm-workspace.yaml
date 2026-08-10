@@ -3,6 +3,19 @@ packages:
   - packages/*
 
 nodeLinker: hoisted
+autoInstallPeers: false
+injectWorkspacePackages: true
+syncInjectedDepsAfterScripts:
+  - build
+
+overrides:
+  'brace-expansion@>=1.0.0 <2.0.0': 1.1.18
+  'brace-expansion@>=2.0.0 <3.0.0': 2.1.4
+  'brace-expansion@>=3.0.0 <4.0.0': 3.0.6
+  'brace-expansion@>=4.0.0 <5.0.9': 5.0.9
+  'fast-uri@>=3.0.0 <3.1.5': 3.1.5
+  'js-yaml@>=4.0.0 <4.3.1': 4.3.1
+  'nanoid@>=3.0.0 <3.3.17': 3.3.17
 
 allowBuilds:
   '@prisma/engines': true

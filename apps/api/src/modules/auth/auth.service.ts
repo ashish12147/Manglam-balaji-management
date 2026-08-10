@@ -237,7 +237,7 @@ export class AuthService {
             expiresAt,
             phoneE164: input.phone,
             plaintextCode: issued.deliveryCode,
-            purpose: 'SIGN_IN',
+            purpose: 'SIGN_IN' as const,
           },
           recordId: claim.recordId,
           response,
@@ -825,5 +825,3 @@ function unwrapOutcome<T>(outcome: StoredOutcome<T>): T {
   }
   throw new ApiError(outcome.error);
 }
-
-

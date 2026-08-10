@@ -138,11 +138,7 @@ export class CurrentIdentityService {
       throw authenticationFailure();
     }
 
-
-    const fingerprintDigest = this.digests.deviceFingerprint(
-      deviceFingerprint,
-      session.societyId,
-    );
+    const fingerprintDigest = this.digests.deviceFingerprint(deviceFingerprint, session.societyId);
     if (!digestMatches(fingerprintDigest, session.device.fingerprintDigest)) {
       throw authenticationFailure();
     }
@@ -152,12 +148,8 @@ export class CurrentIdentityService {
     );
     const activeFlatIds = session.user.memberships.map((membership) => membership.flatId);
     const assignedGateIds = [
-      ...(session.user.guardProfile?.gateAssignments.map(
-        (assignment) => assignment.gateId,
-      ) ?? []),
-      ...(session.device.guardDevice?.gateAssignments.map(
-        (assignment) => assignment.gateId,
-      ) ?? []),
+      ...(session.user.guardProfile?.gateAssignments.map((assignment) => assignment.gateId) ?? []),
+      ...(session.device.guardDevice?.gateAssignments.map((assignment) => assignment.gateId) ?? []),
     ].filter((gateId, index, all) => all.indexOf(gateId) === index);
 
     const grantScopes = new Map<PermissionAction, Set<PermissionScopeKind>>();
@@ -167,7 +159,7 @@ export class CurrentIdentityService {
         if (!isPermissionAction(action)) {
           continue;
         }
-        const allowedScopes = PERMISSION_BY_ACTION[action].scopes;
+        const allowedScopes: readonly PermissionScopeKind[] = PERMISSION_BY_ACTION[action].scopes;
         const scopes = grantScopes.get(action) ?? new Set<PermissionScopeKind>();
 
         if (allowedScopes.includes('SELF')) {
@@ -201,9 +193,10 @@ export class CurrentIdentityService {
       }
     }
 
-    const directGrants: DirectPermissionGrant[] = [...grantScopes].map(
-      ([action, scopes]) => ({ action, scopes: [...scopes] }),
-    );
+    const directGrants: DirectPermissionGrant[] = [...grantScopes].map(([action, scopes]) => ({
+      action,
+      scopes: [...scopes],
+    }));
     const actor: AuthorizationActor = {
       active: true,
       activeFlatIds,
@@ -238,11 +231,8 @@ export class CurrentIdentityService {
       })),
       recentlyAuthenticated:
         session.user.lastAuthenticatedAt !== null &&
-        now.getTime() - session.user.lastAuthenticatedAt.getTime() <=
-          RECENT_AUTHENTICATION_MS,
-      roleCodes: session.user.roleAssignments.map(
-        (assignment) => assignment.role.code,
-      ),
+        now.getTime() - session.user.lastAuthenticatedAt.getTime() <= RECENT_AUTHENTICATION_MS,
+      roleCodes: session.user.roleAssignments.map((assignment) => assignment.role.code),
       sessionId: session.id,
       sessionKind: session.kind,
       societyId: session.societyId,

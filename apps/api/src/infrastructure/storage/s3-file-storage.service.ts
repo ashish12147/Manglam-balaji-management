@@ -48,7 +48,6 @@ export class S3FileStorageService implements PrivateFileStorageProvider {
 
   async createUploadUrl(intent: UploadIntent): Promise<SignedUpload> {
     const objectKey = this.requireObjectKey(intent.objectKey, 'quarantine/');
-    const expiresIn = this.requireExpiry(intent.expiresInSeconds);
 
     if (!this.allowedMimeTypes.has(intent.contentType)) {
       throw new Error('The requested content type is not allowed.');
@@ -62,6 +61,7 @@ export class S3FileStorageService implements PrivateFileStorageProvider {
     if (!SHA256_BASE64.test(intent.checksumSha256)) {
       throw new Error('The SHA-256 checksum must be base64 encoded.');
     }
+    const expiresIn = this.requireExpiry(intent.expiresInSeconds);
 
     const maximumBytes = String(intent.maximumBytes);
     const command = new PutObjectCommand({
