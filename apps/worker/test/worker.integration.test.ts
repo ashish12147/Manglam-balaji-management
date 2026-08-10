@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
+import type { SqlDatabase } from '../src/outbox/repository.js';
+
 const missing = [
   !process.env.TEST_DATABASE_URL && 'TEST_DATABASE_URL is not configured',
   !process.env.TEST_REDIS_URL && 'TEST_REDIS_URL is not configured',
@@ -37,70 +39,73 @@ describe('worker PostgreSQL and Redis integration', () => {
       );
       const societyId = randomUUID();
       const eventId = randomUUID();
+      const rollbackFixture = new Error('Rollback worker integration fixture.');
       let connected = false;
-      let eventInserted = false;
-      let societyInserted = false;
 
       try {
         await database.$connect();
         connected = true;
         await expect(redisProbe.ping()).resolves.toBe('PONG');
-        await database.$executeRawUnsafe(
-          `INSERT INTO societies (id, singleton_key, name, updated_at)
-           VALUES ($1, $2, 'Worker integration test', NOW())`,
-          societyId,
-          'MANGLAM_BALAJI',
-        );
-        societyInserted = true;
-        await database.$executeRawUnsafe(
-          `INSERT INTO outbox_events
-            (id, society_id, aggregate_type, aggregate_id, event_type, payload,
-             dedupe_key, correlation_id, updated_at)
-           VALUES ($1, $2, 'integration', $1, 'integration.test', '{}'::jsonb,
-                   $3, $4, NOW())`,
-          eventId,
-          societyId,
-          `worker-integration:${eventId}`,
-          randomUUID(),
-        );
-        eventInserted = true;
+        await expect(
+          database.$transaction(async (transaction: SqlDatabase) => {
+            await transaction.$executeRawUnsafe(
+              `INSERT INTO societies (id, singleton_key, name, updated_at)
+               VALUES ($1, $2, 'Worker integration test', NOW())`,
+              societyId,
+              'MANGLAM_BALAJI',
+            );
+            await transaction.$executeRawUnsafe(
+              `INSERT INTO outbox_events
+                (id, society_id, aggregate_type, aggregate_id, event_type, payload,
+                 dedupe_key, correlation_id, updated_at)
+               VALUES ($1, $2, 'integration', $1, 'integration.test', '{}'::jsonb,
+                       $3, $4, NOW())`,
+              eventId,
+              societyId,
+              `worker-integration:${eventId}`,
+              randomUUID(),
+            );
 
-        const repository = new OutboxRepository(database, 3);
-        const firstLease = await repository.lease(1, 30);
-        expect(firstLease).toHaveLength(1);
-        expect(firstLease[0]).toMatchObject({
-          attemptCount: 1,
-          id: eventId,
-          societyId,
-        });
-        await repository.fail(firstLease[0]!, new Error('integration retry'));
-        await database.$executeRawUnsafe(
-          `UPDATE outbox_events
-           SET available_at = NOW()
-           WHERE id = $1 AND society_id = $2`,
-          eventId,
-          societyId,
-        );
+            const repository = new OutboxRepository(transaction, 3);
+            const firstLease = await repository.lease(1, 30);
+            expect(firstLease).toHaveLength(1);
+            expect(firstLease[0]).toMatchObject({
+              attemptCount: 1,
+              id: eventId,
+              societyId,
+            });
+            await repository.fail(firstLease[0]!, new Error('integration retry'));
+            await transaction.$executeRawUnsafe(
+              `UPDATE outbox_events
+               SET available_at = NOW()
+               WHERE id = $1 AND society_id = $2`,
+              eventId,
+              societyId,
+            );
 
-        const secondLease = await repository.lease(1, 30);
-        expect(secondLease[0]).toMatchObject({
-          attemptCount: 2,
-          id: eventId,
-          societyId,
-        });
-        await repository.publish(secondLease[0]!);
-        const state = (await database.$queryRawUnsafe(
-          `SELECT event.status::text AS status,
-                  COUNT(attempt.id)::bigint AS attempts
-           FROM outbox_events AS event
-           LEFT JOIN outbox_attempts AS attempt
-             ON attempt.outbox_event_id = event.id
-           WHERE event.id = $1 AND event.society_id = $2
-           GROUP BY event.status`,
-          eventId,
-          societyId,
-        )) as Array<{ attempts: bigint; status: string }>;
-        expect(state).toEqual([{ attempts: 2n, status: 'PUBLISHED' }]);
+            const secondLease = await repository.lease(1, 30);
+            expect(secondLease[0]).toMatchObject({
+              attemptCount: 2,
+              id: eventId,
+              societyId,
+            });
+            await repository.publish(secondLease[0]!);
+            const state = (await transaction.$queryRawUnsafe(
+              `SELECT event.status::text AS status,
+                      COUNT(attempt.id)::bigint AS attempts
+               FROM outbox_events AS event
+               LEFT JOIN outbox_attempts AS attempt
+                 ON attempt.outbox_event_id = event.id
+               WHERE event.id = $1 AND event.society_id = $2
+               GROUP BY event.status`,
+              eventId,
+              societyId,
+            )) as Array<{ attempts: bigint; status: string }>;
+            expect(state).toEqual([{ attempts: 2n, status: 'PUBLISHED' }]);
+
+            throw rollbackFixture;
+          }),
+        ).rejects.toBe(rollbackFixture);
 
         let resolveWake: (() => void) | undefined;
         let rejectWake: ((error: unknown) => void) | undefined;
@@ -139,26 +144,6 @@ describe('worker PostgreSQL and Redis integration', () => {
           if (redisProbe.status === 'ready') await redisProbe.quit();
           else redisProbe.disconnect(false);
         });
-        if (connected && eventInserted) {
-          await cleanup(async () => {
-            await database.$executeRawUnsafe(
-              `DELETE FROM outbox_attempts WHERE outbox_event_id = $1`,
-              eventId,
-            );
-          });
-          await cleanup(async () => {
-            await database.$executeRawUnsafe(
-              `DELETE FROM outbox_events WHERE id = $1 AND society_id = $2`,
-              eventId,
-              societyId,
-            );
-          });
-        }
-        if (connected && societyInserted) {
-          await cleanup(async () => {
-            await database.$executeRawUnsafe(`DELETE FROM societies WHERE id = $1`, societyId);
-          });
-        }
         if (connected) await cleanup(() => database.$disconnect());
         if (cleanupErrors.length > 0) {
           throw new AggregateError(cleanupErrors, 'Worker integration cleanup failed.');
