@@ -85,12 +85,12 @@ describeDatabase(`PostgreSQL migration integration (${url ? 'enabled' : skipReas
     try {
       await client.query(`SET search_path TO "${schemaName}"`);
       await client.query(
-        `INSERT INTO societies (id, singleton_key, name) VALUES ($1, 'MANGLAM_BALAJI', 'Integration Society')`,
+        `INSERT INTO societies (id, singleton_key, name, updated_at) VALUES ($1, 'MANGLAM_BALAJI', 'Integration Society', NOW())`,
         [randomUUID()],
       );
       await expect(
         client.query(
-          `INSERT INTO societies (id, singleton_key, name) VALUES ($1, 'MANGLAM_BALAJI', 'Another Society')`,
+          `INSERT INTO societies (id, singleton_key, name, updated_at) VALUES ($1, 'MANGLAM_BALAJI', 'Another Society', NOW())`,
           [randomUUID()],
         ),
       ).rejects.toThrow();
@@ -160,7 +160,7 @@ describeDatabase(`PostgreSQL migration integration (${url ? 'enabled' : skipReas
         .rows[0]!.id;
       const userId = randomUUID();
       await client.query(
-        `INSERT INTO users (id, society_id, normalized_phone, phone_digest, display_name, status) VALUES ($1, $2, '+919999999999', repeat('a', 64), 'Integration Admin', 'ACTIVE')`,
+        `INSERT INTO users (id, society_id, normalized_phone, phone_digest, display_name, status, updated_at) VALUES ($1, $2, '+919999999999', repeat('a', 64), 'Integration Admin', 'ACTIVE', NOW())`,
         [userId, societyId],
       );
       const credentialId = randomUUID();
@@ -186,19 +186,19 @@ describeDatabase(`PostgreSQL migration integration (${url ? 'enabled' : skipReas
 
       const deviceId = randomUUID();
       await client.query(
-        `INSERT INTO devices (id, society_id, fingerprint_digest) VALUES ($1, $2, repeat('b', 64))`,
+        `INSERT INTO devices (id, society_id, fingerprint_digest, updated_at) VALUES ($1, $2, repeat('b', 64), NOW())`,
         [deviceId, societyId],
       );
       await expect(
         client.query(
-          `INSERT INTO guard_devices (society_id, device_id, status) VALUES ($1, $2, 'PENDING')`,
+          `INSERT INTO guard_devices (society_id, device_id, status, updated_at) VALUES ($1, $2, 'PENDING', NOW())`,
           [societyId, deviceId],
         ),
       ).rejects.toThrow();
       await expect(
         client.query(
-          `INSERT INTO guard_devices (society_id, device_id, status, enrollment_token_digest, enrollment_expires_at)
-           VALUES ($1, $2, 'PENDING', repeat('c', 64), NOW() + interval '15 minutes')`,
+          `INSERT INTO guard_devices (society_id, device_id, status, enrollment_token_digest, enrollment_expires_at, updated_at)
+           VALUES ($1, $2, 'PENDING', repeat('c', 64), NOW() + interval '15 minutes', NOW())`,
           [randomUUID(), deviceId],
         ),
       ).rejects.toThrow();
