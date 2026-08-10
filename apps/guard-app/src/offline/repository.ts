@@ -1,17 +1,17 @@
-import * as Crypto from "expo-crypto";
-import type { SQLiteDatabase } from "expo-sqlite";
+import * as Crypto from 'expo-crypto';
+import type { SQLiteDatabase } from 'expo-sqlite';
 
-import type { OfflineMutationResult } from "@/api/endpoints";
-import { assertOfflineOperationAllowed, type OfflineOperation } from "@/offline/operations";
-import { hashCanonicalPayload, signOfflineMutation } from "@/offline/protocol-crypto";
-import { applyServerResult, transitionQueueState, type QueueState } from "@/offline/state-machine";
+import type { OfflineMutationResult } from '@/api/endpoints';
+import { assertOfflineOperationAllowed, type OfflineOperation } from '@/offline/operations';
+import { hashCanonicalPayload, signOfflineMutation } from '@/offline/protocol-crypto';
+import { applyServerResult, transitionQueueState, type QueueState } from '@/offline/state-machine';
 import type {
   DailyHelpDirectoryItem,
   DirectorySnapshot,
   FlatDirectoryItem,
   OfflineDeviceSnapshot,
-  SyncStatus
-} from "@/types/domain";
+  SyncStatus,
+} from '@/types/domain';
 
 interface MutationRow {
   aggregate_id: string | null;
@@ -125,14 +125,14 @@ function mapMutation(row: MutationRow): StoredMutation {
     serverRecordId: row.server_record_id,
     signature: row.signature,
     status: row.status,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
   };
 }
 
 function validateSnapshot(
   snapshot: DirectorySnapshot,
   expectedDeviceId: string,
-  gateId: string
+  gateId: string,
 ): { device: OfflineDeviceSnapshot; expiresAt: string } {
   const generatedAt = new Date(snapshot.generatedAt).getTime();
   const serverExpiry = new Date(snapshot.expiresAt).getTime();
@@ -141,16 +141,16 @@ function validateSnapshot(
   if (
     !snapshot.device ||
     snapshot.device.id !== expectedDeviceId ||
-    snapshot.device.status !== "ACTIVE" ||
+    snapshot.device.status !== 'ACTIVE' ||
     !snapshot.device.assignedGateIds.includes(gateId)
   ) {
-    throw new Error("The server did not issue an active offline lease for this device and gate.");
+    throw new Error('The server did not issue an active offline lease for this device and gate.');
   }
   if (
     !Number.isSafeInteger(snapshot.device.lastAcceptedSequence) ||
     snapshot.device.lastAcceptedSequence < 0
   ) {
-    throw new Error("The server returned an invalid offline sequence.");
+    throw new Error('The server returned an invalid offline sequence.');
   }
   if (
     Number.isNaN(generatedAt) ||
@@ -160,17 +160,14 @@ function validateSnapshot(
     serverExpiry <= generatedAt ||
     leaseExpiresAt <= leaseIssuedAt
   ) {
-    throw new Error("The server returned an invalid directory or device lease.");
+    throw new Error('The server returned an invalid directory or device lease.');
   }
   if (!Array.isArray(snapshot.flats) || !Array.isArray(snapshot.dailyHelp)) {
-    throw new Error("The server returned an invalid directory snapshot.");
+    throw new Error('The server returned an invalid directory snapshot.');
   }
-  const expiresAt = Math.min(
-    serverExpiry,
-    leaseExpiresAt,
-    generatedAt + 24 * 60 * 60_000
-  );
-  if (expiresAt <= Date.now()) throw new Error("The server returned an already expired offline lease.");
+  const expiresAt = Math.min(serverExpiry, leaseExpiresAt, generatedAt + 24 * 60 * 60_000);
+  if (expiresAt <= Date.now())
+    throw new Error('The server returned an already expired offline lease.');
   return { device: snapshot.device, expiresAt: new Date(expiresAt).toISOString() };
 }
 
@@ -178,13 +175,13 @@ export async function replaceDirectorySnapshot(
   db: SQLiteDatabase,
   gateId: string,
   expectedDeviceId: string,
-  snapshot: DirectorySnapshot
+  snapshot: DirectorySnapshot,
 ): Promise<void> {
   const { device, expiresAt } = validateSnapshot(snapshot, expectedDeviceId, gateId);
   const updatedAt = new Date().toISOString();
   await db.withExclusiveTransactionAsync(async (transaction) => {
-    await transaction.runAsync("DELETE FROM directory_flats WHERE gate_id = ?", gateId);
-    await transaction.runAsync("DELETE FROM daily_help_directory WHERE gate_id = ?", gateId);
+    await transaction.runAsync('DELETE FROM directory_flats WHERE gate_id = ?', gateId);
+    await transaction.runAsync('DELETE FROM daily_help_directory WHERE gate_id = ?', gateId);
 
     for (const flat of snapshot.flats) {
       await transaction.runAsync(
@@ -199,7 +196,7 @@ export async function replaceDirectorySnapshot(
         flat.displayLabel,
         flat.residentDisplayName ?? null,
         expiresAt,
-        JSON.stringify({ ...flat, snapshotExpiresAt: expiresAt })
+        JSON.stringify({ ...flat, snapshotExpiresAt: expiresAt }),
       );
     }
 
@@ -214,7 +211,7 @@ export async function replaceDirectorySnapshot(
         helper.type,
         helper.status,
         expiresAt,
-        JSON.stringify({ ...helper, snapshotExpiresAt: expiresAt })
+        JSON.stringify({ ...helper, snapshotExpiresAt: expiresAt }),
       );
     }
 
@@ -230,7 +227,7 @@ export async function replaceDirectorySnapshot(
       snapshot.snapshotId,
       snapshot.generatedAt,
       expiresAt,
-      updatedAt
+      updatedAt,
     );
     await transaction.runAsync(
       `INSERT INTO offline_leases (
@@ -248,7 +245,7 @@ export async function replaceDirectorySnapshot(
       device.leaseIssuedAt,
       expiresAt,
       device.lastAcceptedSequence,
-      updatedAt
+      updatedAt,
     );
     await transaction.runAsync(
       `INSERT INTO offline_sequences (device_id, gate_id, next_sequence)
@@ -257,7 +254,7 @@ export async function replaceDirectorySnapshot(
          next_sequence = MAX(offline_sequences.next_sequence, excluded.next_sequence)`,
       device.id,
       gateId,
-      device.lastAcceptedSequence + 1
+      device.lastAcceptedSequence + 1,
     );
   });
 }
@@ -268,18 +265,18 @@ async function snapshotMeta(db: SQLiteDatabase, gateId: string) {
     generated_at: string;
     snapshot_id: string;
   }>(
-    "SELECT snapshot_id, generated_at, expires_at FROM snapshot_metadata WHERE gate_id = ?",
-    gateId
+    'SELECT snapshot_id, generated_at, expires_at FROM snapshot_metadata WHERE gate_id = ?',
+    gateId,
   );
 }
 
 export async function getOfflineLeaseStatus(
   db: SQLiteDatabase,
-  gateId: string
+  gateId: string,
 ): Promise<OfflineLeaseStatus> {
   const lease = await db.getFirstAsync<LeaseRow>(
-    "SELECT * FROM offline_leases WHERE gate_id = ?",
-    gateId
+    'SELECT * FROM offline_leases WHERE gate_id = ?',
+    gateId,
   );
   const expiresAt = lease?.lease_expires_at ?? null;
   return {
@@ -287,14 +284,14 @@ export async function getOfflineLeaseStatus(
     expiresAt,
     isExpired: !expiresAt || new Date(expiresAt).getTime() <= Date.now(),
     issuedAt: lease?.lease_issued_at ?? null,
-    lastAcceptedSequence: lease?.last_accepted_sequence ?? null
+    lastAcceptedSequence: lease?.last_accepted_sequence ?? null,
   };
 }
 
 export async function searchFlatDirectory(
   db: SQLiteDatabase,
   gateId: string,
-  search: string
+  search: string,
 ): Promise<DirectorySearchResult<FlatDirectoryItem>> {
   const metadata = await snapshotMeta(db, gateId);
   const expiresAt = metadata?.expires_at ?? null;
@@ -305,11 +302,11 @@ export async function searchFlatDirectory(
       generatedAt: metadata?.generated_at ?? null,
       isExpired: true,
       items: [],
-      snapshotId: metadata?.snapshot_id ?? null
+      snapshotId: metadata?.snapshot_id ?? null,
     };
   }
 
-  const like = `%${search.trim().replace(/[%_]/g, "")}%`;
+  const like = `%${search.trim().replace(/[%_]/g, '')}%`;
   const rows = await db.getAllAsync<{ payload_json: string }>(
     `SELECT payload_json FROM directory_flats
       WHERE gate_id = ?
@@ -320,21 +317,23 @@ export async function searchFlatDirectory(
     like,
     like,
     like,
-    like
+    like,
   );
   return {
     expiresAt,
     generatedAt: metadata?.generated_at ?? null,
     isExpired: false,
-    items: rows.map((row) => parseJson<FlatDirectoryItem>(row.payload_json, {} as FlatDirectoryItem)),
-    snapshotId: metadata?.snapshot_id ?? null
+    items: rows.map((row) =>
+      parseJson<FlatDirectoryItem>(row.payload_json, {} as FlatDirectoryItem),
+    ),
+    snapshotId: metadata?.snapshot_id ?? null,
   };
 }
 
 export async function searchDailyHelpDirectory(
   db: SQLiteDatabase,
   gateId: string,
-  search: string
+  search: string,
 ): Promise<DirectorySearchResult<DailyHelpDirectoryItem>> {
   const metadata = await snapshotMeta(db, gateId);
   const expiresAt = metadata?.expires_at ?? null;
@@ -345,10 +344,10 @@ export async function searchDailyHelpDirectory(
       generatedAt: metadata?.generated_at ?? null,
       isExpired: true,
       items: [],
-      snapshotId: metadata?.snapshot_id ?? null
+      snapshotId: metadata?.snapshot_id ?? null,
     };
   }
-  const like = `%${search.trim().replace(/[%_]/g, "")}%`;
+  const like = `%${search.trim().replace(/[%_]/g, '')}%`;
   const rows = await db.getAllAsync<{ payload_json: string }>(
     `SELECT payload_json FROM daily_help_directory
       WHERE gate_id = ? AND status = 'ACTIVE' AND (name LIKE ? OR type LIKE ?)
@@ -356,16 +355,16 @@ export async function searchDailyHelpDirectory(
       LIMIT 50`,
     gateId,
     like,
-    like
+    like,
   );
   return {
     expiresAt,
     generatedAt: metadata?.generated_at ?? null,
     isExpired: false,
     items: rows.map((row) =>
-      parseJson<DailyHelpDirectoryItem>(row.payload_json, {} as DailyHelpDirectoryItem)
+      parseJson<DailyHelpDirectoryItem>(row.payload_json, {} as DailyHelpDirectoryItem),
     ),
-    snapshotId: metadata?.snapshot_id ?? null
+    snapshotId: metadata?.snapshot_id ?? null,
   };
 }
 
@@ -381,49 +380,52 @@ export async function enqueueMutation(
     gateId: string;
     operation: string;
     payload: Record<string, unknown>;
-  }
+  },
 ): Promise<StoredMutation> {
   assertOfflineOperationAllowed(input.operation);
   if (!UUID_PATTERN.test(input.deviceId) || !UUID_PATTERN.test(input.gateId)) {
-    throw new Error("The registered device or gate identifier is invalid.");
+    throw new Error('The registered device or gate identifier is invalid.');
   }
   if (
     input.baseVersion !== null &&
     input.baseVersion !== undefined &&
     (!Number.isSafeInteger(input.baseVersion) || input.baseVersion < 0)
   ) {
-    throw new Error("The offline action has an invalid server version.");
+    throw new Error('The offline action has an invalid server version.');
   }
 
   const clientMutationId = Crypto.randomUUID();
   const aggregateId = input.aggregateId ?? input.entityId ?? clientMutationId;
-  if (!UUID_PATTERN.test(aggregateId)) throw new Error("The offline aggregate identifier is invalid.");
+  if (!UUID_PATTERN.test(aggregateId))
+    throw new Error('The offline aggregate identifier is invalid.');
   const localCreatedAt = new Date().toISOString();
   let stored: StoredMutation | null = null;
 
   await db.withExclusiveTransactionAsync(async (transaction) => {
     const lease = await transaction.getFirstAsync<LeaseRow>(
-      "SELECT * FROM offline_leases WHERE gate_id = ?",
-      input.gateId
+      'SELECT * FROM offline_leases WHERE gate_id = ?',
+      input.gateId,
     );
     if (
       !lease ||
       lease.device_id !== input.deviceId ||
       new Date(lease.lease_expires_at).getTime() <= Date.now()
     ) {
-      throw new Error("The offline device lease is missing or expired. Reconnect and refresh before recording this action.");
+      throw new Error(
+        'The offline device lease is missing or expired. Reconnect and refresh before recording this action.',
+      );
     }
     const sequenceRow = await transaction.getFirstAsync<{ next_sequence: number }>(
-      "SELECT next_sequence FROM offline_sequences WHERE device_id = ? AND gate_id = ?",
+      'SELECT next_sequence FROM offline_sequences WHERE device_id = ? AND gate_id = ?',
       input.deviceId,
-      input.gateId
+      input.gateId,
     );
     const localSequence = Math.max(
       sequenceRow?.next_sequence ?? 1,
-      lease.last_accepted_sequence + 1
+      lease.last_accepted_sequence + 1,
     );
     if (!Number.isSafeInteger(localSequence) || localSequence <= 0) {
-      throw new Error("The offline device sequence is invalid.");
+      throw new Error('The offline device sequence is invalid.');
     }
     const payloadHash = await hashCanonicalPayload(input.payload);
     const signature = await signOfflineMutation(
@@ -436,9 +438,9 @@ export async function enqueueMutation(
         gateId: input.gateId,
         localSequence,
         operation: input.operation,
-        payloadHash
+        payloadHash,
       },
-      input.deviceSecret
+      input.deviceSecret,
     );
     await transaction.runAsync(
       `INSERT INTO offline_mutations (
@@ -462,7 +464,7 @@ export async function enqueueMutation(
       input.gateId,
       localCreatedAt,
       localCreatedAt,
-      localCreatedAt
+      localCreatedAt,
     );
     await transaction.runAsync(
       `INSERT INTO offline_sequences (device_id, gate_id, next_sequence)
@@ -470,45 +472,45 @@ export async function enqueueMutation(
        ON CONFLICT(device_id, gate_id) DO UPDATE SET next_sequence = excluded.next_sequence`,
       input.deviceId,
       input.gateId,
-      localSequence + 1
+      localSequence + 1,
     );
     const row = await transaction.getFirstAsync<MutationRow>(
-      "SELECT * FROM offline_mutations WHERE client_mutation_id = ?",
-      clientMutationId
+      'SELECT * FROM offline_mutations WHERE client_mutation_id = ?',
+      clientMutationId,
     );
     stored = row ? mapMutation(row) : null;
   });
-  if (!stored) throw new Error("The offline action was not persisted.");
+  if (!stored) throw new Error('The offline action was not persisted.');
   return stored;
 }
 
 export async function getMutation(db: SQLiteDatabase, id: string): Promise<StoredMutation | null> {
   const row = await db.getFirstAsync<MutationRow>(
-    "SELECT * FROM offline_mutations WHERE client_mutation_id = ?",
-    id
+    'SELECT * FROM offline_mutations WHERE client_mutation_id = ?',
+    id,
   );
   return row ? mapMutation(row) : null;
 }
 
 export async function listMutations(
   db: SQLiteDatabase,
-  filters: { gateId?: string; status?: SyncStatus; limit?: number } = {}
+  filters: { gateId?: string; status?: SyncStatus; limit?: number } = {},
 ): Promise<StoredMutation[]> {
   const conditions: string[] = [];
   const params: (number | string)[] = [];
   if (filters.gateId) {
-    conditions.push("gate_id = ?");
+    conditions.push('gate_id = ?');
     params.push(filters.gateId);
   }
   if (filters.status) {
-    conditions.push("status = ?");
+    conditions.push('status = ?');
     params.push(filters.status);
   }
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   params.push(Math.min(200, Math.max(1, filters.limit ?? 100)));
   const rows = await db.getAllAsync<MutationRow>(
     `SELECT * FROM offline_mutations ${where} ORDER BY local_created_at DESC LIMIT ?`,
-    params
+    params,
   );
   return rows.map(mapMutation);
 }
@@ -516,7 +518,7 @@ export async function listMutations(
 export async function claimReadyMutations(
   db: SQLiteDatabase,
   gateId: string,
-  limit: number = 20
+  limit: number = 20,
 ): Promise<StoredMutation[]> {
   const now = new Date().toISOString();
   const ids = await db.getAllAsync<{ client_mutation_id: string }>(
@@ -539,7 +541,7 @@ export async function claimReadyMutations(
     gateId,
     now,
     now,
-    Math.min(50, Math.max(1, limit))
+    Math.min(50, Math.max(1, limit)),
   );
   if (!ids.length) return [];
 
@@ -554,14 +556,14 @@ export async function claimReadyMutations(
             AND status IN ('LOCAL_PENDING', 'FAILED')`,
         now,
         now,
-        item.client_mutation_id
+        item.client_mutation_id,
       );
     }
   });
   const claimed: StoredMutation[] = [];
   for (const item of ids) {
     const mutation = await getMutation(db, item.client_mutation_id);
-    if (mutation?.status === "SYNCING") claimed.push(mutation);
+    if (mutation?.status === 'SYNCING') claimed.push(mutation);
   }
   return claimed;
 }
@@ -569,7 +571,7 @@ export async function claimReadyMutations(
 export async function applyMutationResult(
   db: SQLiteDatabase,
   id: string,
-  result: OfflineMutationResult
+  result: OfflineMutationResult,
 ): Promise<void> {
   const current = await getMutation(db, id);
   if (!current) throw new Error(`Offline mutation ${id} was not found.`);
@@ -589,20 +591,27 @@ export async function applyMutationResult(
     next.errorMessage,
     result.correlationId ?? null,
     now,
-    id
+    id,
   );
 }
 
 export async function retryMutation(db: SQLiteDatabase, id: string): Promise<void> {
   const current = await getMutation(db, id);
-  if (!current) throw new Error("The offline action was not found.");
-  if (current.status !== "FAILED" && current.status !== "CONFLICT") {
+  if (!current) throw new Error('The offline action was not found.');
+  if (current.status !== 'FAILED' && current.status !== 'CONFLICT') {
     throw new Error(`A ${current.status} action cannot be retried.`);
   }
-  if (!current.aggregateId || !current.localSequence || !current.payloadHash || !current.signature) {
-    throw new Error("This legacy action is unsigned and cannot be retried. Review its payload and enter it again.");
+  if (
+    !current.aggregateId ||
+    !current.localSequence ||
+    !current.payloadHash ||
+    !current.signature
+  ) {
+    throw new Error(
+      'This legacy action is unsigned and cannot be retried. Review its payload and enter it again.',
+    );
   }
-  const next = transitionQueueState(current, "LOCAL_PENDING");
+  const next = transitionQueueState(current, 'LOCAL_PENDING');
   await db.runAsync(
     `UPDATE offline_mutations
         SET status = ?, next_attempt_at = NULL, conflict_json = NULL,
@@ -610,7 +619,7 @@ export async function retryMutation(db: SQLiteDatabase, id: string): Promise<voi
       WHERE client_mutation_id = ?`,
     next.status,
     new Date().toISOString(),
-    id
+    id,
   );
 }
 
@@ -620,16 +629,16 @@ export async function queueCounts(db: SQLiteDatabase, gateId?: string): Promise<
     FAILED: 0,
     LOCAL_PENDING: 0,
     SYNCED: 0,
-    SYNCING: 0
+    SYNCING: 0,
   };
   const rows = gateId
     ? await db.getAllAsync<{ count: number; status: SyncStatus }>(
         `SELECT status, COUNT(*) AS count FROM offline_mutations
           WHERE gate_id = ? GROUP BY status`,
-        gateId
+        gateId,
       )
     : await db.getAllAsync<{ count: number; status: SyncStatus }>(
-        "SELECT status, COUNT(*) AS count FROM offline_mutations GROUP BY status"
+        'SELECT status, COUNT(*) AS count FROM offline_mutations GROUP BY status',
       );
   for (const row of rows) counts[row.status] = row.count;
   return counts;
@@ -637,11 +646,11 @@ export async function queueCounts(db: SQLiteDatabase, gateId?: string): Promise<
 
 export async function purgeGateData(db: SQLiteDatabase): Promise<void> {
   await db.withExclusiveTransactionAsync(async (transaction) => {
-    await transaction.runAsync("DELETE FROM directory_flats");
-    await transaction.runAsync("DELETE FROM daily_help_directory");
-    await transaction.runAsync("DELETE FROM snapshot_metadata");
-    await transaction.runAsync("DELETE FROM offline_leases");
-    await transaction.runAsync("DELETE FROM offline_sequences");
-    await transaction.runAsync("DELETE FROM offline_mutations");
+    await transaction.runAsync('DELETE FROM directory_flats');
+    await transaction.runAsync('DELETE FROM daily_help_directory');
+    await transaction.runAsync('DELETE FROM snapshot_metadata');
+    await transaction.runAsync('DELETE FROM offline_leases');
+    await transaction.runAsync('DELETE FROM offline_sequences');
+    await transaction.runAsync('DELETE FROM offline_mutations');
   });
 }

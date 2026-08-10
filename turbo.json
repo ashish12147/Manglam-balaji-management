@@ -16,15 +16,15 @@
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@manglam/database#build"],
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@manglam/database#build"],
       "outputs": ["coverage/**"]
     },
     "test:coverage": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@manglam/database#build"],
       "outputs": ["coverage/**"]
     },
     "test:e2e": {
@@ -33,10 +33,10 @@
     },
     "test:integration": {
       "cache": false,
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "@manglam/database#build"]
     },
     "typecheck": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "@manglam/database#build"],
       "outputs": []
     }
   }

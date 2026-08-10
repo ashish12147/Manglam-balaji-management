@@ -20,19 +20,12 @@ import { uuidSchema } from '@manglam/validation';
 
 import { ApiError } from '../../common/http/api-error.js';
 import { ZodValidationPipe } from '../../common/http/zod-validation.pipe.js';
-import {
-  CurrentPrincipal,
-  Public,
-  RequireAnyPermission,
-} from '../access/access.decorators.js';
+import { CurrentPrincipal, Public, RequireAnyPermission } from '../access/access.decorators.js';
 import { AccessSessionGuard } from '../access/access-session.guard.js';
 import type { AuthenticatedPrincipal } from '../access/access.types.js';
 import { PermissionGuard } from '../access/permission.guard.js';
 import { success } from '../platform/api-response.js';
-import {
-  mutationRequestContext,
-  requestCorrelationId,
-} from '../platform/request-context.js';
+import { mutationRequestContext, requestCorrelationId } from '../platform/request-context.js';
 import {
   adminSignInBodySchema,
   guardEnrollBodySchema,
@@ -61,10 +54,7 @@ import { CurrentUserService } from './current-user.service.js';
 import { GuardAuthService } from './guard-auth.service.js';
 import { RefreshCookieService } from './refresh-cookie.service.js';
 import { ResidentPinService } from './resident-pin.service.js';
-import {
-  SessionService,
-  type SessionTokenResponse,
-} from './session.service.js';
+import { SessionService, type SessionTokenResponse } from './session.service.js';
 
 @ApiTags('authentication')
 @Controller('auth')
@@ -83,10 +73,7 @@ export class AuthController {
     @Body(new ZodValidationPipe(otpRequestBodySchema)) input: OtpRequestInput,
     @Req() request: Request,
   ): Promise<object> {
-    const response = await this.auth.requestOtp(
-      input,
-      mutationRequestContext(request),
-    );
+    const response = await this.auth.requestOtp(input, mutationRequestContext(request));
     return success(response, requestCorrelationId(request));
   }
 
@@ -96,10 +83,7 @@ export class AuthController {
     @Body(new ZodValidationPipe(otpVerifyBodySchema)) input: OtpVerifyInput,
     @Req() request: Request,
   ): Promise<object> {
-    const response = await this.auth.verifyOtp(
-      input,
-      mutationRequestContext(request),
-    );
+    const response = await this.auth.verifyOtp(input, mutationRequestContext(request));
     return success(response, requestCorrelationId(request));
   }
 
@@ -109,10 +93,7 @@ export class AuthController {
     @Body(new ZodValidationPipe(guardSignInBodySchema)) input: GuardSignInInput,
     @Req() request: Request,
   ): Promise<object> {
-    const response = await this.auth.signInGuard(
-      input,
-      mutationRequestContext(request),
-    );
+    const response = await this.auth.signInGuard(input, mutationRequestContext(request));
     return success(response, requestCorrelationId(request));
   }
 
@@ -122,10 +103,7 @@ export class AuthController {
     @Body(new ZodValidationPipe(guardEnrollBodySchema)) input: GuardEnrollInput,
     @Req() request: Request,
   ): Promise<object> {
-    const response = await this.guards.enroll(
-      input,
-      mutationRequestContext(request),
-    );
+    const response = await this.guards.enroll(input, mutationRequestContext(request));
     return success(response, requestCorrelationId(request));
   }
 
@@ -137,10 +115,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<object> {
     this.cookies.assertTrustedOrigin(request);
-    const tokens = await this.auth.signInAdmin(
-      input,
-      mutationRequestContext(request),
-    );
+    const tokens = await this.auth.signInAdmin(input, mutationRequestContext(request));
     this.cookies.set(response, tokens.refreshToken, new Date(tokens.refreshTokenExpiresAt));
     return success(withoutRefreshToken(tokens), requestCorrelationId(request));
   }
@@ -152,10 +127,7 @@ export class AuthController {
     @Body(new ZodValidationPipe(pinUnlockBodySchema)) input: PinUnlockInput,
     @Req() request: Request,
   ): Promise<object> {
-    const response = await this.pins.unlock(
-      input,
-      mutationRequestContext(request),
-    );
+    const response = await this.pins.unlock(input, mutationRequestContext(request));
     return success(response, requestCorrelationId(request));
   }
 
@@ -169,11 +141,7 @@ export class AuthController {
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Req() request: Request,
   ): Promise<object> {
-    const response = await this.pins.setPin(
-      principal,
-      input,
-      mutationRequestContext(request),
-    );
+    const response = await this.pins.setPin(principal, input, mutationRequestContext(request));
     return success(response, requestCorrelationId(request));
   }
 
@@ -195,11 +163,7 @@ export class AuthController {
       mutationRequestContext(request),
     );
     if (cookie.present) {
-      this.cookies.set(
-        response,
-        tokens.refreshToken,
-        new Date(tokens.refreshTokenExpiresAt),
-      );
+      this.cookies.set(response, tokens.refreshToken, new Date(tokens.refreshTokenExpiresAt));
     }
     return success(
       cookie.present ? withoutRefreshToken(tokens) : tokens,
@@ -219,10 +183,7 @@ export class AuthController {
   ): Promise<object> {
     const cookie = this.cookies.read(request);
     if (cookie.present) this.cookies.assertTrustedOrigin(request);
-    const result = await this.sessions.logout(
-      principal,
-      mutationRequestContext(request),
-    );
+    const result = await this.sessions.logout(principal, mutationRequestContext(request));
     this.cookies.clear(response);
     return success(result, requestCorrelationId(request));
   }
@@ -244,10 +205,7 @@ export class CurrentUserController {
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Req() request: Request,
   ): Promise<object> {
-    return success(
-      await this.currentUsers.get(principal),
-      requestCorrelationId(request),
-    );
+    return success(await this.currentUsers.get(principal), requestCorrelationId(request));
   }
 
   @Patch()
@@ -258,11 +216,7 @@ export class CurrentUserController {
     @Req() request: Request,
   ): Promise<object> {
     return success(
-      await this.currentUsers.update(
-        principal,
-        input,
-        mutationRequestContext(request),
-      ),
+      await this.currentUsers.update(principal, input, mutationRequestContext(request)),
       requestCorrelationId(request),
     );
   }
@@ -274,10 +228,7 @@ export class CurrentUserController {
     @Query(new ZodValidationPipe(sessionListQuerySchema)) query: SessionListQuery,
     @Req() request: Request,
   ): Promise<object> {
-    return success(
-      await this.sessions.list(principal, query),
-      requestCorrelationId(request),
-    );
+    return success(await this.sessions.list(principal, query), requestCorrelationId(request));
   }
 
   @Post('sessions/:sessionId/revoke')
@@ -289,12 +240,7 @@ export class CurrentUserController {
     @Param('sessionId') sessionId: string,
     @Req() request: Request,
   ): Promise<object> {
-    return this.revoke(
-      body.reason ?? 'Revoked by user',
-      principal,
-      sessionId,
-      request,
-    );
+    return this.revoke(body.reason ?? 'Revoked by user', principal, sessionId, request);
   }
 
   private async revoke(
@@ -327,10 +273,7 @@ export class SessionAliasController {
     @Query(new ZodValidationPipe(sessionListQuerySchema)) query: SessionListQuery,
     @Req() request: Request,
   ): Promise<object> {
-    return success(
-      await this.sessions.list(principal, query),
-      requestCorrelationId(request),
-    );
+    return success(await this.sessions.list(principal, query), requestCorrelationId(request));
   }
 
   @Delete(':sessionId')

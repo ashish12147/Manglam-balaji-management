@@ -1,23 +1,25 @@
-import type { SQLiteDatabase } from "expo-sqlite";
+import type { SQLiteDatabase } from 'expo-sqlite';
 
-import { getOrCreateDatabaseKey } from "@/auth/storage";
+import { getOrCreateDatabaseKey } from '@/auth/storage';
 
 const DATABASE_VERSION = 2;
 
 export async function initializeGuardDatabase(db: SQLiteDatabase): Promise<void> {
   const key = await getOrCreateDatabaseKey();
-  if (!/^[a-f0-9]{64}$/.test(key)) throw new Error("The local database key is invalid.");
+  if (!/^[a-f0-9]{64}$/.test(key)) throw new Error('The local database key is invalid.');
 
   // SQLCipher requires the key before any read from an existing encrypted database.
   await db.execAsync(`PRAGMA key = '${key}';`);
-  await db.execAsync("PRAGMA cipher_memory_security = ON;");
-  await db.execAsync("PRAGMA foreign_keys = ON;");
-  await db.execAsync("PRAGMA journal_mode = WAL;");
+  await db.execAsync('PRAGMA cipher_memory_security = ON;');
+  await db.execAsync('PRAGMA foreign_keys = ON;');
+  await db.execAsync('PRAGMA journal_mode = WAL;');
 
-  const row = await db.getFirstAsync<{ user_version: number }>("PRAGMA user_version");
+  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const currentVersion = row?.user_version ?? 0;
   if (currentVersion > DATABASE_VERSION) {
-    throw new Error("This guard app is older than its local database. Update the app before continuing.");
+    throw new Error(
+      'This guard app is older than its local database. Update the app before continuing.',
+    );
   }
 
   if (currentVersion < 1) {
@@ -164,6 +166,6 @@ export async function initializeGuardDatabase(db: SQLiteDatabase): Promise<void>
            updated_at = ?
      WHERE status = 'SYNCING'`,
     now,
-    now
+    now,
   );
 }

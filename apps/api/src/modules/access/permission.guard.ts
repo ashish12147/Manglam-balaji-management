@@ -1,14 +1,8 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-import {
-  PERMISSION_REQUIREMENTS,
-  PUBLIC_ROUTE,
-} from './access.decorators.js';
-import type {
-  AuthenticatedRequest,
-  PermissionRequirement,
-} from './access.types.js';
+import { PERMISSION_REQUIREMENTS, PUBLIC_ROUTE } from './access.decorators.js';
+import type { AuthenticatedRequest, PermissionRequirement } from './access.types.js';
 import { AuthorizationService } from './authorization.service.js';
 
 @Injectable()
@@ -28,10 +22,10 @@ export class PermissionGuard implements CanActivate {
     }
 
     const requirements =
-      this.reflector.getAllAndOverride<readonly PermissionRequirement[]>(
-        PERMISSION_REQUIREMENTS,
-        [context.getHandler(), context.getClass()],
-      ) ?? [];
+      this.reflector.getAllAndOverride<readonly PermissionRequirement[]>(PERMISSION_REQUIREMENTS, [
+        context.getHandler(),
+        context.getClass(),
+      ]) ?? [];
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     await this.authorization.assertAny(request.principal, request, requirements);
     return true;

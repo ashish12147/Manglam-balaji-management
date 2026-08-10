@@ -1,27 +1,27 @@
-import { useQuery } from "@tanstack/react-query";
-import { Clock3, ScanLine, UserPlus, UsersRound } from "lucide-react-native";
-import { useRouter } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { useQuery } from '@tanstack/react-query';
+import { Clock3, ScanLine, UserPlus, UsersRound } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
-import { endpoints } from "@/api/endpoints";
-import { ActionButton } from "@/components/Controls";
-import { RecordItem } from "@/components/Records";
-import { Screen } from "@/components/Screen";
-import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/StatePanel";
-import { PageTitle, SectionTitle } from "@/components/Typography";
-import { useConnectivity } from "@/connectivity/connectivity-context";
-import { spacing } from "@/theme/tokens";
-import { formatDateTime } from "@/utils/date";
-import { humanizeConstant } from "@/utils/text";
+import { endpoints } from '@/api/endpoints';
+import { ActionButton } from '@/components/Controls';
+import { RecordItem } from '@/components/Records';
+import { Screen } from '@/components/Screen';
+import { ErrorPanel, LoadingPanel, StatePanel } from '@/components/StatePanel';
+import { PageTitle, SectionTitle } from '@/components/Typography';
+import { useConnectivity } from '@/connectivity/connectivity-context';
+import { spacing } from '@/theme/tokens';
+import { formatDateTime } from '@/utils/date';
+import { humanizeConstant } from '@/utils/text';
 
 export default function VisitorsScreen() {
   const router = useRouter();
   const connectivity = useConnectivity();
   const visitors = useQuery({
     enabled: connectivity.isOnline,
-    queryFn: () => endpoints.visitorList("AWAITING_APPROVAL,APPROVED,CHECKED_IN"),
-    queryKey: ["visitors", "gate-active"],
-    refetchInterval: 5_000
+    queryFn: () => endpoints.visitorList('AWAITING_APPROVAL,APPROVED,CHECKED_IN'),
+    queryKey: ['visitors', 'gate-active'],
+    refetchInterval: 5_000,
   });
   return (
     <Screen onRefresh={() => void visitors.refetch()} refreshing={visitors.isRefetching}>
@@ -33,7 +33,7 @@ export default function VisitorsScreen() {
           <ActionButton
             icon={UserPlus}
             label="Register visitor"
-            onPress={() => router.push("/visitor/new")}
+            onPress={() => router.push('/visitor/new')}
             secondaryLabel="विज़िटर दर्ज करें"
           />
         </View>
@@ -42,7 +42,7 @@ export default function VisitorsScreen() {
             disabled={!connectivity.isOnline}
             icon={ScanLine}
             label="Verify code"
-            onPress={() => router.push("/visitor/code")}
+            onPress={() => router.push('/visitor/code')}
             secondaryLabel="कोड जांचें"
             variant="secondary"
           />
@@ -51,7 +51,7 @@ export default function VisitorsScreen() {
           <ActionButton
             icon={UsersRound}
             label="All active visits"
-            onPress={() => router.push("/visitor/active")}
+            onPress={() => router.push('/visitor/active')}
             secondaryLabel="सक्रिय विज़िटर"
             variant="secondary"
           />
@@ -68,9 +68,15 @@ export default function VisitorsScreen() {
       ) : visitors.isLoading ? (
         <LoadingPanel />
       ) : visitors.isError ? (
-        <ErrorPanel message={(visitors.error as Error).message} onRetry={() => void visitors.refetch()} />
+        <ErrorPanel
+          message={(visitors.error as Error).message}
+          onRetry={() => void visitors.refetch()}
+        />
       ) : visitors.data?.items.length === 0 ? (
-        <StatePanel detail="There are no visitors awaiting a decision or currently inside." title="No active visitors" />
+        <StatePanel
+          detail="There are no visitors awaiting a decision or currently inside."
+          title="No active visitors"
+        />
       ) : (
         <View style={styles.records}>
           {visitors.data?.items.map((visit) => (
@@ -79,14 +85,14 @@ export default function VisitorsScreen() {
               icon={UsersRound}
               key={visit.id}
               meta={formatDateTime(visit.arrivedAt ?? visit.createdAt)}
-              onPress={() => router.push({ pathname: "/visitor/[id]", params: { id: visit.id } })}
+              onPress={() => router.push({ pathname: '/visitor/[id]', params: { id: visit.id } })}
               status={humanizeConstant(visit.status)}
               statusTone={
-                visit.status === "REJECTED" || visit.status === "APPROVAL_TIMED_OUT"
-                  ? "critical"
-                  : visit.status === "CHECKED_IN"
-                    ? "success"
-                    : "warning"
+                visit.status === 'REJECTED' || visit.status === 'APPROVAL_TIMED_OUT'
+                  ? 'critical'
+                  : visit.status === 'CHECKED_IN'
+                    ? 'success'
+                    : 'warning'
               }
               title={visit.visitorName}
             />
@@ -99,16 +105,16 @@ export default function VisitorsScreen() {
 
 const styles = StyleSheet.create({
   actionCell: {
-    flexBasis: "47%",
+    flexBasis: '47%',
     flexGrow: 1,
-    minWidth: 160
+    minWidth: 160,
   },
   actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
   records: {
-    gap: spacing.sm
-  }
+    gap: spacing.sm,
+  },
 });

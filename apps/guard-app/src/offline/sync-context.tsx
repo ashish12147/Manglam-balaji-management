@@ -1,10 +1,18 @@
-import { useSQLiteContext } from "expo-sqlite";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useSQLiteContext } from 'expo-sqlite';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
-import { ApiError, isApiError, isRetryableApiError } from "@/api/errors";
-import { endpoints, type OfflineMutationResult } from "@/api/endpoints";
-import { useSession } from "@/auth/session-context";
-import { useConnectivity } from "@/connectivity/connectivity-context";
+import { ApiError, isApiError, isRetryableApiError } from '@/api/errors';
+import { endpoints, type OfflineMutationResult } from '@/api/endpoints';
+import { useSession } from '@/auth/session-context';
+import { useConnectivity } from '@/connectivity/connectivity-context';
 import {
   applyMutationResult,
   claimReadyMutations,
@@ -21,10 +29,10 @@ import {
   type DirectorySearchResult,
   type OfflineLeaseStatus,
   type QueueCounts,
-  type StoredMutation
-} from "@/offline/repository";
-import type { OfflineOperation } from "@/offline/operations";
-import type { DailyHelpDirectoryItem, FlatDirectoryItem, SyncStatus } from "@/types/domain";
+  type StoredMutation,
+} from '@/offline/repository';
+import type { OfflineOperation } from '@/offline/operations';
+import type { DailyHelpDirectoryItem, FlatDirectoryItem, SyncStatus } from '@/types/domain';
 
 interface EnqueueInput {
   aggregateId?: string | null;
@@ -57,7 +65,7 @@ const emptyCounts: QueueCounts = {
   FAILED: 0,
   LOCAL_PENDING: 0,
   SYNCED: 0,
-  SYNCING: 0
+  SYNCING: 0,
 };
 
 const emptyLease: OfflineLeaseStatus = {
@@ -65,7 +73,7 @@ const emptyLease: OfflineLeaseStatus = {
   expiresAt: null,
   isExpired: true,
   issuedAt: null,
-  lastAcceptedSequence: null
+  lastAcceptedSequence: null,
 };
 
 const SyncContext = createContext<SyncContextValue | null>(null);
@@ -87,10 +95,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const serverDeviceId = session.metadata?.device.id ?? null;
   const deviceSecret = session.deviceIdentity?.installationSecret ?? null;
   const canOperate =
-    session.metadata?.device.status === "ACTIVE" &&
-    !!gateId &&
-    !!serverDeviceId &&
-    !!deviceSecret;
+    session.metadata?.device.status === 'ACTIVE' && !!gateId && !!serverDeviceId && !!deviceSecret;
 
   const refreshLocalState = useCallback(async () => {
     const nextCounts = await queueCounts(db, gateId ?? undefined);
@@ -115,7 +120,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       if (!force) {
-        const current = await searchFlatDirectory(db, gateId, "");
+        const current = await searchFlatDirectory(db, gateId, '');
         const generatedAt = current.generatedAt ? new Date(current.generatedAt).getTime() : 0;
         if (!current.isExpired && generatedAt > Date.now() - 15 * 60_000) return;
       }
@@ -127,23 +132,17 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         await refreshLocalState();
         setError(null);
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "Directory synchronization failed.");
+        setError(caught instanceof Error ? caught.message : 'Directory synchronization failed.');
       } finally {
         snapshotLock.current = false;
         setIsRefreshingSnapshot(false);
       }
     },
-    [canOperate, connectivity.isOnline, db, gateId, refreshLocalState, serverDeviceId]
+    [canOperate, connectivity.isOnline, db, gateId, refreshLocalState, serverDeviceId],
   );
 
   const syncNow = useCallback(async () => {
-    if (
-      !canOperate ||
-      !gateId ||
-      !serverDeviceId ||
-      !connectivity.isOnline ||
-      syncLock.current
-    ) {
+    if (!canOperate || !gateId || !serverDeviceId || !connectivity.isOnline || syncLock.current) {
       return;
     }
     syncLock.current = true;
@@ -161,7 +160,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
               !mutation.payloadHash ||
               !mutation.signature
             ) {
-              throw new Error("An unsigned or incomplete offline action was selected for synchronization.");
+              throw new Error(
+                'An unsigned or incomplete offline action was selected for synchronization.',
+              );
             }
             return {
               aggregateId: mutation.aggregateId,
@@ -174,28 +175,31 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
               operation: mutation.operation,
               payload: mutation.payload,
               payloadHash: mutation.payloadHash,
-              signature: mutation.signature
+              signature: mutation.signature,
             };
           });
           const response = await endpoints.syncMutations({
             deviceId: serverDeviceId,
             gateId,
-            mutations
+            mutations,
           });
-          const results = new Map(response.results.map((result) => [result.clientMutationId, result]));
+          const results = new Map(
+            response.results.map((result) => [result.clientMutationId, result]),
+          );
           for (const mutation of claimed) {
             const serverResult = results.get(mutation.clientMutationId);
             const result: OfflineMutationResult = serverResult
               ? {
                   ...serverResult,
-                  serverRecordId: serverResult.serverRecordId ?? serverResult.serverEntityId ?? null
+                  serverRecordId:
+                    serverResult.serverRecordId ?? serverResult.serverEntityId ?? null,
                 }
               : {
                   clientMutationId: mutation.clientMutationId,
-                  code: "SYNC_RESULT_MISSING",
-                  message: "The server did not return a result for this action.",
+                  code: 'SYNC_RESULT_MISSING',
+                  message: 'The server did not return a result for this action.',
                   retryable: true,
-                  status: "FAILED"
+                  status: 'FAILED',
                 };
             await applyMutationResult(db, mutation.clientMutationId, result);
           }
@@ -203,53 +207,50 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           if (
             isApiError(caught) &&
             [
-              "DEVICE_ENROLLMENT_REQUIRED",
-              "DEVICE_LOST",
-              "DEVICE_NOT_ACTIVE",
-              "DEVICE_REVOKED"
+              'DEVICE_ENROLLMENT_REQUIRED',
+              'DEVICE_LOST',
+              'DEVICE_NOT_ACTIVE',
+              'DEVICE_REVOKED',
             ].includes(caught.code)
           ) {
             await purgeGateData(db);
             const status =
-              caught.code === "DEVICE_LOST"
-                ? "LOST"
-                : caught.code === "DEVICE_ENROLLMENT_REQUIRED" || caught.code === "DEVICE_NOT_ACTIVE"
-                  ? "PENDING"
-                  : "REVOKED";
+              caught.code === 'DEVICE_LOST'
+                ? 'LOST'
+                : caught.code === 'DEVICE_ENROLLMENT_REQUIRED' ||
+                    caught.code === 'DEVICE_NOT_ACTIVE'
+                  ? 'PENDING'
+                  : 'REVOKED';
             await session.markDeviceStatus(status);
             throw caught;
           }
           const resultFor = (clientMutationId: string): OfflineMutationResult => ({
             clientMutationId,
-            code: isApiError(caught) ? caught.code : "SYNC_REQUEST_FAILED",
+            code: isApiError(caught) ? caught.code : 'SYNC_REQUEST_FAILED',
             correlationId: isApiError(caught) ? caught.correlationId : null,
-            message: caught instanceof Error ? caught.message : "Synchronization failed.",
+            message: caught instanceof Error ? caught.message : 'Synchronization failed.',
             retryable: isRetryableApiError(caught) || !(caught instanceof ApiError),
-            status: "FAILED"
+            status: 'FAILED',
           });
           for (const mutation of claimed) {
-            await applyMutationResult(db, mutation.clientMutationId, resultFor(mutation.clientMutationId));
+            await applyMutationResult(
+              db,
+              mutation.clientMutationId,
+              resultFor(mutation.clientMutationId),
+            );
           }
           throw caught;
         }
       }
       setLastCompletedAt(new Date().toISOString());
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Synchronization failed.");
+      setError(caught instanceof Error ? caught.message : 'Synchronization failed.');
     } finally {
       syncLock.current = false;
       setIsSyncing(false);
       await refreshLocalState();
     }
-  }, [
-    canOperate,
-    connectivity.isOnline,
-    db,
-    gateId,
-    refreshLocalState,
-    serverDeviceId,
-    session
-  ]);
+  }, [canOperate, connectivity.isOnline, db, gateId, refreshLocalState, serverDeviceId, session]);
 
   useEffect(() => {
     if (!connectivity.isOnline || !canOperate) return;
@@ -262,13 +263,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const enqueue = useCallback(
     async (input: EnqueueInput) => {
       if (!canOperate || !gateId || !serverDeviceId || !deviceSecret) {
-        throw new Error("Select an active registered device and gate before recording an action.");
+        throw new Error('Select an active registered device and gate before recording an action.');
       }
       const mutation = await enqueueMutation(db, {
         ...input,
         deviceId: serverDeviceId,
         deviceSecret,
-        gateId
+        gateId,
       });
       await refreshLocalState();
       if (connectivity.isOnline) setTimeout(() => void syncNow(), 0);
@@ -282,8 +283,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       gateId,
       refreshLocalState,
       serverDeviceId,
-      syncNow
-    ]
+      syncNow,
+    ],
   );
 
   const retry = useCallback(
@@ -292,7 +293,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       await refreshLocalState();
       if (connectivity.isOnline) await syncNow();
     },
-    [connectivity.isOnline, db, refreshLocalState, syncNow]
+    [connectivity.isOnline, db, refreshLocalState, syncNow],
   );
 
   const value = useMemo<SyncContextValue>(
@@ -315,7 +316,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             generatedAt: null,
             isExpired: true,
             items: [],
-            snapshotId: null
+            snapshotId: null,
           });
         }
         return searchDailyHelpDirectory(db, gateId, search);
@@ -327,12 +328,12 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
             generatedAt: null,
             isExpired: true,
             items: [],
-            snapshotId: null
+            snapshotId: null,
           });
         }
         return searchFlatDirectory(db, gateId, search);
       },
-      syncNow
+      syncNow,
     }),
     [
       counts,
@@ -346,8 +347,8 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       lease,
       refreshSnapshot,
       retry,
-      syncNow
-    ]
+      syncNow,
+    ],
   );
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;
@@ -355,6 +356,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
 export function useSync(): SyncContextValue {
   const context = useContext(SyncContext);
-  if (!context) throw new Error("useSync must be used inside SyncProvider");
+  if (!context) throw new Error('useSync must be used inside SyncProvider');
   return context;
 }

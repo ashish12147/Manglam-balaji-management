@@ -57,10 +57,7 @@ export class AuthReplayService {
         status: HttpStatus.CONFLICT,
       });
     }
-    if (
-      record.status === IdempotencyStatus.COMPLETED &&
-      record.responseBody !== null
-    ) {
+    if (record.status === IdempotencyStatus.COMPLETED && record.responseBody !== null) {
       return { found: true, value: this.cipher.decrypt<T>(record.responseBody) };
     }
     if (

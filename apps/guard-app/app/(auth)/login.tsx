@@ -1,22 +1,22 @@
-import { KeyRound, LogIn, RefreshCw, ShieldCheck } from "lucide-react-native";
-import { useRouter } from "expo-router";
-import { Controller, useForm } from "react-hook-form";
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
-import { useState } from "react";
-import { z } from "zod";
+import { KeyRound, LogIn, RefreshCw, ShieldCheck } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Controller, useForm } from 'react-hook-form';
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { z } from 'zod';
 
-import { isApiError } from "@/api/errors";
-import { useSession } from "@/auth/session-context";
-import { ActionButton, Field } from "@/components/Controls";
-import { Screen } from "@/components/Screen";
-import { StatePanel } from "@/components/StatePanel";
-import { colors, radii, spacing, typography } from "@/theme/tokens";
-import { zodFormResolver } from "@/utils/zod-form-resolver";
+import { isApiError } from '@/api/errors';
+import { useSession } from '@/auth/session-context';
+import { ActionButton, Field } from '@/components/Controls';
+import { Screen } from '@/components/Screen';
+import { StatePanel } from '@/components/StatePanel';
+import { colors, radii, spacing, typography } from '@/theme/tokens';
+import { zodFormResolver } from '@/utils/zod-form-resolver';
 
 const schema = z.object({
-  employeeCode: z.string().trim().min(2, "Enter your guard employee code.").max(40),
+  employeeCode: z.string().trim().min(2, 'Enter your guard employee code.').max(40),
   enrollmentToken: z.string().trim().max(256),
-  pin: z.string().regex(/^\d{4,12}$/, "PIN must contain 4 to 12 digits.")
+  pin: z.string().regex(/^\d{4,12}$/, 'PIN must contain 4 to 12 digits.'),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -32,10 +32,10 @@ export default function LoginScreen() {
     clearErrors,
     setError,
     setValue,
-    formState: { errors, isSubmitting }
+    formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    defaultValues: { employeeCode: "", enrollmentToken: "", pin: "" },
-    resolver: zodFormResolver(schema)
+    defaultValues: { employeeCode: '', enrollmentToken: '', pin: '' },
+    resolver: zodFormResolver(schema),
   });
 
   if (session.configurationError) {
@@ -55,23 +55,23 @@ export default function LoginScreen() {
   }
 
   function showError(caught: unknown, fallback: string) {
-    setError("root", {
+    setError('root', {
       message: isApiError(caught)
-        ? `${caught.message}${caught.correlationId ? ` Reference: ${caught.correlationId}` : ""}`
+        ? `${caught.message}${caught.correlationId ? ` Reference: ${caught.correlationId}` : ''}`
         : caught instanceof Error
           ? caught.message
-          : fallback
+          : fallback,
     });
   }
 
   async function recoverSession() {
     setRecovering(true);
-    clearErrors("root");
+    clearErrors('root');
     try {
       await session.retrySessionRecovery();
-      router.replace("/");
+      router.replace('/');
     } catch (caught) {
-      showError(caught, "The stored shift could not be restored.");
+      showError(caught, 'The stored shift could not be restored.');
     } finally {
       setRecovering(false);
     }
@@ -81,36 +81,37 @@ export default function LoginScreen() {
     session.clearError();
     try {
       await session.signIn(values.employeeCode, values.pin);
-      router.replace("/");
+      router.replace('/');
     } catch (caught) {
-      if (isApiError(caught) && caught.code === "DEVICE_ENROLLMENT_REQUIRED") {
+      if (isApiError(caught) && caught.code === 'DEVICE_ENROLLMENT_REQUIRED') {
         setRequiresEnrollment(true);
-        setError("root", {
-          message: "This installation is pending registration. Enter the one-time token issued by an administrator."
+        setError('root', {
+          message:
+            'This installation is pending registration. Enter the one-time token issued by an administrator.',
         });
         return;
       }
-      showError(caught, "Sign-in failed.");
+      showError(caught, 'Sign-in failed.');
     }
   });
 
   const enroll = handleSubmit(async (values) => {
     if (!values.enrollmentToken.trim()) {
-      setError("enrollmentToken", { message: "Enter the administrator-issued enrollment token." });
+      setError('enrollmentToken', { message: 'Enter the administrator-issued enrollment token.' });
       return;
     }
     try {
       await session.enrollDevice(values.employeeCode, values.pin, values.enrollmentToken);
-      setValue("enrollmentToken", "");
-      router.replace("/");
+      setValue('enrollmentToken', '');
+      router.replace('/');
     } catch (caught) {
-      showError(caught, "Device enrollment failed.");
+      showError(caught, 'Device enrollment failed.');
     }
   });
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.keyboard}
     >
       <Screen keyboardShouldPersistTaps="handled">
@@ -121,10 +122,13 @@ export default function LoginScreen() {
           <Text style={styles.brandTitle}>Manglam Balaji Guard</Text>
           <Text style={styles.brandHindi}>मंगलम बालाजी सुरक्षा</Text>
         </View>
-        {session.phase === "RECOVERY_ERROR" ? (
+        {session.phase === 'RECOVERY_ERROR' ? (
           <>
             <StatePanel
-              detail={session.error ?? "The stored shift could not reach the server. Its refresh credential and pending idempotency key remain secure on this device."}
+              detail={
+                session.error ??
+                'The stored shift could not reach the server. Its refresh credential and pending idempotency key remain secure on this device.'
+              }
               icon={RefreshCw}
               title="Shift recovery pending / शिफ्ट रिकवरी बाकी"
               tone="warning"
@@ -212,11 +216,11 @@ export default function LoginScreen() {
           ) : null}
           <ActionButton
             icon={requiresEnrollment ? KeyRound : LogIn}
-            label={requiresEnrollment ? "Enroll device and start shift" : "Start guard shift"}
+            label={requiresEnrollment ? 'Enroll device and start shift' : 'Start guard shift'}
             loading={isSubmitting}
             onPress={() => void (requiresEnrollment ? enroll() : signIn())}
-            secondaryLabel={requiresEnrollment ? "डिवाइस पंजीकृत करें" : "गार्ड शिफ्ट शुरू करें"}
-            variant={requiresEnrollment ? "warning" : "primary"}
+            secondaryLabel={requiresEnrollment ? 'डिवाइस पंजीकृत करें' : 'गार्ड शिफ्ट शुरू करें'}
+            variant={requiresEnrollment ? 'warning' : 'primary'}
           />
           {requiresEnrollment ? (
             <ActionButton
@@ -224,7 +228,7 @@ export default function LoginScreen() {
               label="Back to sign in"
               onPress={() => {
                 setRequiresEnrollment(false);
-                setValue("enrollmentToken", "");
+                setValue('enrollmentToken', '');
                 clearErrors();
               }}
               secondaryLabel="साइन इन पर वापस"
@@ -233,7 +237,8 @@ export default function LoginScreen() {
           ) : null}
         </View>
         <Text style={styles.securityNote}>
-          Only an active guard and an administrator-enrolled device can open gate operations. There is no shared login.
+          Only an active guard and an administrator-enrolled device can open gate operations. There
+          is no shared login.
         </Text>
       </Screen>
     </KeyboardAvoidingView>
@@ -241,12 +246,37 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  brand: { alignItems: "center", gap: spacing.xs, marginTop: spacing.xxl },
+  brand: { alignItems: 'center', gap: spacing.xs, marginTop: spacing.xxl },
   brandHindi: { color: colors.muted, fontSize: typography.body },
-  brandTitle: { color: colors.ink, fontSize: typography.heading, fontWeight: "800", textAlign: "center" },
-  error: { backgroundColor: colors.criticalSoft, borderRadius: radii.md, color: colors.critical, fontSize: typography.label, lineHeight: 21, padding: spacing.md },
-  form: { alignSelf: "center", gap: spacing.lg, maxWidth: 520, width: "100%" },
+  brandTitle: {
+    color: colors.ink,
+    fontSize: typography.heading,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  error: {
+    backgroundColor: colors.criticalSoft,
+    borderRadius: radii.md,
+    color: colors.critical,
+    fontSize: typography.label,
+    lineHeight: 21,
+    padding: spacing.md,
+  },
+  form: { alignSelf: 'center', gap: spacing.lg, maxWidth: 520, width: '100%' },
   keyboard: { backgroundColor: colors.background, flex: 1 },
-  mark: { alignItems: "center", backgroundColor: colors.primarySoft, borderRadius: radii.md, height: 68, justifyContent: "center", marginBottom: spacing.sm, width: 68 },
-  securityNote: { color: colors.muted, fontSize: typography.caption, lineHeight: 19, textAlign: "center" }
+  mark: {
+    alignItems: 'center',
+    backgroundColor: colors.primarySoft,
+    borderRadius: radii.md,
+    height: 68,
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+    width: 68,
+  },
+  securityNote: {
+    color: colors.muted,
+    fontSize: typography.caption,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
 });

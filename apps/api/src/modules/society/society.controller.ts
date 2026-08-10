@@ -1,30 +1,15 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { uuidSchema } from '@manglam/validation';
 
 import { ZodValidationPipe } from '../../common/http/zod-validation.pipe.js';
-import {
-  CurrentPrincipal,
-  RequireAnyPermission,
-} from '../access/access.decorators.js';
+import { CurrentPrincipal, RequireAnyPermission } from '../access/access.decorators.js';
 import { AccessSessionGuard } from '../access/access-session.guard.js';
 import type { AuthenticatedPrincipal } from '../access/access.types.js';
 import { PermissionGuard } from '../access/permission.guard.js';
 import { success } from '../platform/api-response.js';
-import {
-  mutationRequestContext,
-  requestCorrelationId,
-} from '../platform/request-context.js';
+import { mutationRequestContext, requestCorrelationId } from '../platform/request-context.js';
 import {
   createBlockSchema,
   createFlatSchema,
@@ -58,10 +43,7 @@ export class SocietyController {
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
     @Req() request: Request,
   ): Promise<object> {
-    return success(
-      await this.society.getHierarchy(principal),
-      requestCorrelationId(request),
-    );
+    return success(await this.society.getHierarchy(principal), requestCorrelationId(request));
   }
 
   @Post('blocks')
@@ -86,12 +68,7 @@ export class SocietyController {
     @Req() request: Request,
   ): Promise<object> {
     return success(
-      await this.society.updateBlock(
-        principal,
-        blockId,
-        input,
-        mutationRequestContext(request),
-      ),
+      await this.society.updateBlock(principal, blockId, input, mutationRequestContext(request)),
       requestCorrelationId(request),
     );
   }
@@ -105,12 +82,7 @@ export class SocietyController {
     @Req() request: Request,
   ): Promise<object> {
     return success(
-      await this.society.createFloor(
-        principal,
-        blockId,
-        input,
-        mutationRequestContext(request),
-      ),
+      await this.society.createFloor(principal, blockId, input, mutationRequestContext(request)),
       requestCorrelationId(request),
     );
   }
@@ -124,12 +96,7 @@ export class SocietyController {
     @Req() request: Request,
   ): Promise<object> {
     return success(
-      await this.society.updateFloor(
-        principal,
-        floorId,
-        input,
-        mutationRequestContext(request),
-      ),
+      await this.society.updateFloor(principal, floorId, input, mutationRequestContext(request)),
       requestCorrelationId(request),
     );
   }
@@ -143,12 +110,7 @@ export class SocietyController {
     @Req() request: Request,
   ): Promise<object> {
     return success(
-      await this.society.createFlat(
-        principal,
-        floorId,
-        input,
-        mutationRequestContext(request),
-      ),
+      await this.society.createFlat(principal, floorId, input, mutationRequestContext(request)),
       requestCorrelationId(request),
     );
   }
@@ -162,12 +124,7 @@ export class SocietyController {
     @Req() request: Request,
   ): Promise<object> {
     return success(
-      await this.society.updateFlat(
-        principal,
-        flatId,
-        input,
-        mutationRequestContext(request),
-      ),
+      await this.society.updateFlat(principal, flatId, input, mutationRequestContext(request)),
       requestCorrelationId(request),
     );
   }
@@ -194,12 +151,7 @@ export class SocietyController {
     @Req() request: Request,
   ): Promise<object> {
     return success(
-      await this.society.updateGate(
-        principal,
-        gateId,
-        input,
-        mutationRequestContext(request),
-      ),
+      await this.society.updateGate(principal, gateId, input, mutationRequestContext(request)),
       requestCorrelationId(request),
     );
   }

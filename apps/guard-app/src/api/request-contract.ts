@@ -2,9 +2,9 @@ const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/i;
 
 export function deviceFingerprintHeaders(fingerprint: string | null): Record<string, string> {
   if (!fingerprint || !FINGERPRINT_PATTERN.test(fingerprint)) {
-    throw new Error("The request has no valid 32-byte SecureStore device fingerprint.");
+    throw new Error('The request has no valid 32-byte SecureStore device fingerprint.');
   }
-  return { "X-Device-Fingerprint": fingerprint };
+  return { 'X-Device-Fingerprint': fingerprint };
 }
 
 export function protectedIdentityHeaders(input: {
@@ -15,6 +15,6 @@ export function protectedIdentityHeaders(input: {
   return {
     ...(input.accessToken ? { Authorization: `Bearer ${input.accessToken}` } : {}),
     ...deviceFingerprintHeaders(input.deviceFingerprint),
-    ...(input.gateId ? { "X-Gate-ID": input.gateId } : {})
+    ...(input.gateId ? { 'X-Gate-ID': input.gateId } : {}),
   };
 }

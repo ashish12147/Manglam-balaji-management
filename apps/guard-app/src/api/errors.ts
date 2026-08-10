@@ -21,7 +21,7 @@ export class ApiError extends Error {
     details?: unknown;
   }) {
     super(input.message);
-    this.name = "ApiError";
+    this.name = 'ApiError';
     this.code = input.code;
     this.status = input.status;
     this.correlationId = input.correlationId ?? null;
@@ -36,7 +36,7 @@ export function isApiError(value: unknown): value is ApiError {
 export function getErrorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error && error.message) return error.message;
-  return "The operation could not be completed. Please try again.";
+  return 'The operation could not be completed. Please try again.';
 }
 
 export function isRetryableApiError(error: unknown): boolean {

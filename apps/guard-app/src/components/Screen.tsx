@@ -1,9 +1,9 @@
-import { RefreshControl, ScrollView, StyleSheet, View, type ScrollViewProps } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { RefreshControl, ScrollView, StyleSheet, View, type ScrollViewProps } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors, spacing } from "@/theme/tokens";
+import { colors, spacing } from '@/theme/tokens';
 
-interface ScreenProps extends Pick<ScrollViewProps, "keyboardShouldPersistTaps"> {
+interface ScreenProps extends Pick<ScrollViewProps, 'keyboardShouldPersistTaps'> {
   children: React.ReactNode;
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -13,15 +13,15 @@ interface ScreenProps extends Pick<ScrollViewProps, "keyboardShouldPersistTaps">
 
 export function Screen({
   children,
-  keyboardShouldPersistTaps = "handled",
+  keyboardShouldPersistTaps = 'handled',
   onRefresh,
   refreshing = false,
   scroll = true,
-  testID
+  testID,
 }: ScreenProps) {
   const content = <View style={styles.content}>{children}</View>;
   return (
-    <SafeAreaView edges={["bottom"]} style={styles.safeArea} testID={testID}>
+    <SafeAreaView edges={['bottom']} style={styles.safeArea} testID={testID}>
       {scroll ? (
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -48,18 +48,18 @@ export function Screen({
 
 const styles = StyleSheet.create({
   content: {
-    alignSelf: "center",
+    alignSelf: 'center',
     flexGrow: 1,
     gap: spacing.lg,
     padding: spacing.lg,
-    width: "100%",
-    maxWidth: 920
+    width: '100%',
+    maxWidth: 920,
   },
   safeArea: {
     backgroundColor: colors.background,
-    flex: 1
+    flex: 1,
   },
   scrollContent: {
-    flexGrow: 1
-  }
+    flexGrow: 1,
+  },
 });

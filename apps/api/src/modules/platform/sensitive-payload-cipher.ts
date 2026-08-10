@@ -1,9 +1,4 @@
-import {
-  createCipheriv,
-  createDecipheriv,
-  createHash,
-  randomBytes,
-} from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -59,11 +54,7 @@ export class SensitivePayloadCipher {
       throw new Error('Stored idempotency response is not a supported encrypted payload.');
     }
 
-    const decipher = createDecipheriv(
-      'aes-256-gcm',
-      this.key,
-      Buffer.from(value.iv, 'base64url'),
-    );
+    const decipher = createDecipheriv('aes-256-gcm', this.key, Buffer.from(value.iv, 'base64url'));
     decipher.setAuthTag(Buffer.from(value.tag, 'base64url'));
     const plaintext = Buffer.concat([
       decipher.update(Buffer.from(value.ciphertext, 'base64url')),

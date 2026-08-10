@@ -1,17 +1,17 @@
-import * as ImagePicker from "expo-image-picker";
-import { Camera, RotateCcw, Trash2 } from "lucide-react-native";
-import { useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import * as ImagePicker from 'expo-image-picker';
+import { Camera, RotateCcw, Trash2 } from 'lucide-react-native';
+import { useState } from 'react';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
-import type { LocalImage } from "@/api/uploads";
-import { ActionButton } from "@/components/Controls";
-import { colors, radii, spacing, typography } from "@/theme/tokens";
+import type { LocalImage } from '@/api/uploads';
+import { ActionButton } from '@/components/Controls';
+import { colors, radii, spacing, typography } from '@/theme/tokens';
 
 export function PhotoCapture({
   disabled = false,
   label,
   onChange,
-  value
+  value,
 }: {
   disabled?: boolean;
   label: string;
@@ -25,29 +25,29 @@ export function PhotoCapture({
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        setError("Camera permission was denied. Enable it in Android settings and try again.");
+        setError('Camera permission was denied. Enable it in Android settings and try again.');
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
         cameraType: ImagePicker.CameraType.back,
         exif: false,
-        mediaTypes: ["images"],
-        quality: 0.65
+        mediaTypes: ['images'],
+        quality: 0.65,
       });
       if (result.canceled) return;
       const image = result.assets[0];
       if (!image) {
-        setError("The camera did not return a photograph.");
+        setError('The camera did not return a photograph.');
         return;
       }
       onChange({
         fileName: image.fileName,
         fileSize: image.fileSize,
         mimeType: image.mimeType,
-        uri: image.uri
+        uri: image.uri,
       });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The camera could not be opened.");
+      setError(caught instanceof Error ? caught.message : 'The camera could not be opened.');
     }
   }
 
@@ -56,7 +56,11 @@ export function PhotoCapture({
       <Text style={styles.label}>{label}</Text>
       {value ? (
         <View style={styles.previewGroup}>
-          <Image accessibilityLabel="Captured gate photograph" source={{ uri: value.uri }} style={styles.preview} />
+          <Image
+            accessibilityLabel="Captured gate photograph"
+            source={{ uri: value.uri }}
+            style={styles.preview}
+          />
           <View style={styles.actions}>
             <View style={styles.actionCell}>
               <ActionButton
@@ -93,19 +97,30 @@ export function PhotoCapture({
           variant="secondary"
         />
       )}
-      {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
-      <Text style={styles.hint}>JPEG, PNG or WebP, up to 5 MB. Photos require an online secure upload and security scan.</Text>
+      {error ? (
+        <Text accessibilityLiveRegion="polite" style={styles.error}>
+          {error}
+        </Text>
+      ) : null}
+      <Text style={styles.hint}>
+        JPEG, PNG or WebP, up to 5 MB. Photos require an online secure upload and security scan.
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   actionCell: { flex: 1, minWidth: 140 },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   error: { color: colors.critical, fontSize: typography.label, lineHeight: 21 },
   group: { gap: spacing.sm },
   hint: { color: colors.muted, fontSize: typography.caption, lineHeight: 18 },
-  label: { color: colors.ink, fontSize: typography.label, fontWeight: "700" },
-  preview: { aspectRatio: 16 / 9, backgroundColor: colors.background, borderRadius: radii.md, width: "100%" },
-  previewGroup: { gap: spacing.sm }
+  label: { color: colors.ink, fontSize: typography.label, fontWeight: '700' },
+  preview: {
+    aspectRatio: 16 / 9,
+    backgroundColor: colors.background,
+    borderRadius: radii.md,
+    width: '100%',
+  },
+  previewGroup: { gap: spacing.sm },
 });

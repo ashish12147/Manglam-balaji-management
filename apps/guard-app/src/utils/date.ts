@@ -1,23 +1,23 @@
 export function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "Not available";
+  if (!value) return 'Not available';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Not available";
+  if (Number.isNaN(date.getTime())) return 'Not available';
 
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    month: "short",
-    timeZone: "Asia/Kolkata"
+  return new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+    timeZone: 'Asia/Kolkata',
   }).format(date);
 }
 
 export function formatRelativeAge(value: string | null | undefined): string {
-  if (!value) return "Never";
+  if (!value) return 'Never';
   const time = new Date(value).getTime();
-  if (Number.isNaN(time)) return "Unknown";
+  if (Number.isNaN(time)) return 'Unknown';
   const elapsedSeconds = Math.max(0, Math.floor((Date.now() - time) / 1000));
-  if (elapsedSeconds < 60) return "Just now";
+  if (elapsedSeconds < 60) return 'Just now';
   const minutes = Math.floor(elapsedSeconds / 60);
   if (minutes < 60) return `${minutes} min ago`;
   const hours = Math.floor(minutes / 60);

@@ -13,7 +13,7 @@ function prune(now: number): void {
   }
   while (retainedKeys.size > MAX_RETAINED_KEYS) {
     const oldest = retainedKeys.keys().next().value;
-    if (typeof oldest !== "string") break;
+    if (typeof oldest !== 'string') break;
     retainedKeys.delete(oldest);
   }
 }
@@ -21,7 +21,7 @@ function prune(now: number): void {
 export function idempotencyKeyForRetry(
   fingerprint: string,
   proposedKey: string,
-  now: number = Date.now()
+  now: number = Date.now(),
 ): string {
   prune(now);
   return retainedKeys.get(fingerprint)?.key ?? proposedKey;
@@ -30,7 +30,7 @@ export function idempotencyKeyForRetry(
 export function retainIdempotencyKey(
   fingerprint: string,
   key: string,
-  now: number = Date.now()
+  now: number = Date.now(),
 ): void {
   retainedKeys.delete(fingerprint);
   retainedKeys.set(fingerprint, { key, retainedAt: now });

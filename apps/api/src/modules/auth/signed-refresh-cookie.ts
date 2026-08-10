@@ -8,16 +8,11 @@ export function signRefreshCookie(token: string, secret: string): string {
   }
   const payload = Buffer.from(token, 'utf8').toString('base64url');
   const unsigned = `${COOKIE_FORMAT_VERSION}.${payload}`;
-  const signature = createHmac('sha256', secret)
-    .update(unsigned, 'ascii')
-    .digest('base64url');
+  const signature = createHmac('sha256', secret).update(unsigned, 'ascii').digest('base64url');
   return `${unsigned}.${signature}`;
 }
 
-export function verifyRefreshCookie(
-  value: string,
-  secret: string,
-): string | null {
+export function verifyRefreshCookie(value: string, secret: string): string | null {
   if (value.length > 1_024 || secret.length < 32) {
     return null;
   }
@@ -32,9 +27,7 @@ export function verifyRefreshCookie(
   ) {
     return null;
   }
-  const expected = createHmac('sha256', secret)
-    .update(`${version}.${payload}`, 'ascii')
-    .digest();
+  const expected = createHmac('sha256', secret).update(`${version}.${payload}`, 'ascii').digest();
   let actual: Buffer;
   try {
     actual = Buffer.from(signature, 'base64url');

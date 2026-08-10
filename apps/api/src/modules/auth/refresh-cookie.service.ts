@@ -4,10 +4,7 @@ import type { Request, Response } from 'express';
 
 import { ApiError } from '../../common/http/api-error.js';
 import type { AppEnvironment } from '../../config/env.schema.js';
-import {
-  signRefreshCookie,
-  verifyRefreshCookie,
-} from './signed-refresh-cookie.js';
+import { signRefreshCookie, verifyRefreshCookie } from './signed-refresh-cookie.js';
 
 const REFRESH_COOKIE_NAME = '__Host-mb_refresh';
 
@@ -61,10 +58,7 @@ export class RefreshCookieService {
   }
 
   set(response: Response, token: string, expiresAt: Date): void {
-    const maxAge = Math.max(
-      0,
-      Math.floor((expiresAt.getTime() - Date.now()) / 1_000),
-    );
+    const maxAge = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1_000));
     appendSetCookie(
       response,
       `${REFRESH_COOKIE_NAME}=${signRefreshCookie(token, this.secret)}; Path=/; Expires=${expiresAt.toUTCString()}; Max-Age=${maxAge}; Secure; HttpOnly; SameSite=Strict`,

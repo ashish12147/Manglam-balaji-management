@@ -1,10 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
-export function secretDigest(
-  value: string,
-  context: readonly string[],
-  secret: string,
-): string {
+export function secretDigest(value: string, context: readonly string[], secret: string): string {
   const hmac = createHmac('sha256', secret);
   for (const part of context) {
     hmac.update(`${Buffer.byteLength(part, 'utf8')}:`);

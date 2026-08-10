@@ -1,21 +1,21 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import * as Crypto from "expo-crypto";
-import { Clock3, PackageCheck, RotateCcw } from "lucide-react-native";
-import { useLocalSearchParams } from "expo-router";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as Crypto from 'expo-crypto';
+import { Clock3, PackageCheck, RotateCcw } from 'lucide-react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
-import { endpoints } from "@/api/endpoints";
-import { isPendingFileStatus, parseFileScanStatus } from "@/api/upload-contract";
-import { ActionButton } from "@/components/Controls";
-import { KeyValue } from "@/components/Records";
-import { Screen } from "@/components/Screen";
-import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/StatePanel";
-import { StatusBadge } from "@/components/Status";
-import { PageTitle } from "@/components/Typography";
-import { useConnectivity } from "@/connectivity/connectivity-context";
-import { colors, spacing, typography } from "@/theme/tokens";
-import { formatDateTime } from "@/utils/date";
-import { humanizeConstant } from "@/utils/text";
+import { endpoints } from '@/api/endpoints';
+import { isPendingFileStatus, parseFileScanStatus } from '@/api/upload-contract';
+import { ActionButton } from '@/components/Controls';
+import { KeyValue } from '@/components/Records';
+import { Screen } from '@/components/Screen';
+import { ErrorPanel, LoadingPanel, StatePanel } from '@/components/StatePanel';
+import { StatusBadge } from '@/components/Status';
+import { PageTitle } from '@/components/Typography';
+import { useConnectivity } from '@/connectivity/connectivity-context';
+import { colors, spacing, typography } from '@/theme/tokens';
+import { formatDateTime } from '@/utils/date';
+import { humanizeConstant } from '@/utils/text';
 
 export default function ParcelDetailScreen() {
   const params = useLocalSearchParams<{ id: string; uploadScanStatus?: string }>();
@@ -28,27 +28,44 @@ export default function ParcelDetailScreen() {
   const parcel = useQuery({
     enabled: !!id && connectivity.isOnline,
     queryFn: () => endpoints.parcelDetail(id!),
-    queryKey: ["parcels", id]
+    queryKey: ['parcels', id],
   });
   const transition = useMutation({
-    mutationFn: (action: "collect" | "return") =>
+    mutationFn: (action: 'collect' | 'return') =>
       endpoints.parcelTransition(id!, action, Crypto.randomUUID()),
-    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["parcels"] })
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ['parcels'] }),
   });
 
-  if (!id) return <Screen><ErrorPanel message="The parcel identifier is missing." /></Screen>;
+  if (!id)
+    return (
+      <Screen>
+        <ErrorPanel message="The parcel identifier is missing." />
+      </Screen>
+    );
   if (!connectivity.isOnline) {
     return (
       <Screen>
-        <StatePanel detail="Reconnect to verify the authoritative parcel state and collection code." title="Parcel detail unavailable offline" tone="warning" />
+        <StatePanel
+          detail="Reconnect to verify the authoritative parcel state and collection code."
+          title="Parcel detail unavailable offline"
+          tone="warning"
+        />
       </Screen>
     );
   }
-  if (parcel.isLoading) return <Screen><LoadingPanel /></Screen>;
+  if (parcel.isLoading)
+    return (
+      <Screen>
+        <LoadingPanel />
+      </Screen>
+    );
   if (!parcel.data) {
     return (
       <Screen>
-        <ErrorPanel message={(parcel.error as Error)?.message ?? "Parcel record could not be loaded."} onRetry={() => void parcel.refetch()} />
+        <ErrorPanel
+          message={(parcel.error as Error)?.message ?? 'Parcel record could not be loaded.'}
+          onRetry={() => void parcel.refetch()}
+        />
       </Screen>
     );
   }
@@ -64,8 +81,11 @@ export default function ParcelDetailScreen() {
   return (
     <Screen onRefresh={() => void parcel.refetch()} refreshing={parcel.isRefetching}>
       <View style={styles.heading}>
-        <PageTitle subtitle={record.flat.displayLabel}>{record.description ?? "Parcel"}</PageTitle>
-        <StatusBadge label={humanizeConstant(record.status)} tone={record.status === "HELD_AT_GATE" ? "warning" : "success"} />
+        <PageTitle subtitle={record.flat.displayLabel}>{record.description ?? 'Parcel'}</PageTitle>
+        <StatusBadge
+          label={humanizeConstant(record.status)}
+          tone={record.status === 'HELD_AT_GATE' ? 'warning' : 'success'}
+        />
       </View>
       {photoScanPending ? (
         <StatePanel
@@ -77,31 +97,43 @@ export default function ParcelDetailScreen() {
       ) : null}
       <View>
         <KeyValue label="Flat" value={record.flat.displayLabel} />
-        <KeyValue label="Courier" value={record.courierName ?? "Not supplied"} />
+        <KeyValue label="Courier" value={record.courierName ?? 'Not supplied'} />
         <KeyValue label="Recorded" value={formatDateTime(record.createdAt)} />
         <KeyValue label="Held at" value={formatDateTime(record.heldAt)} />
         <KeyValue label="Collected at" value={formatDateTime(record.collectedAt)} />
       </View>
-      {record.status === "HELD_AT_GATE" ? (
+      {record.status === 'HELD_AT_GATE' ? (
         <>
           <ActionButton
             icon={PackageCheck}
             label="Mark collected"
             loading={transition.isPending}
-            onPress={() => Alert.alert("Confirm collection", `Release this parcel for ${record.flat.displayLabel}?`, [
-              { style: "cancel", text: "Cancel" },
-              { onPress: () => transition.mutate("collect"), text: "Collected" }
-            ])}
+            onPress={() =>
+              Alert.alert(
+                'Confirm collection',
+                `Release this parcel for ${record.flat.displayLabel}?`,
+                [
+                  { style: 'cancel', text: 'Cancel' },
+                  { onPress: () => transition.mutate('collect'), text: 'Collected' },
+                ],
+              )
+            }
             secondaryLabel="कलेक्ट किया"
           />
           <ActionButton
             icon={RotateCcw}
             label="Return parcel"
             loading={transition.isPending}
-            onPress={() => Alert.alert("Return parcel", "Return this parcel to the courier or sender?", [
-              { style: "cancel", text: "Cancel" },
-              { onPress: () => transition.mutate("return"), style: "destructive", text: "Return" }
-            ])}
+            onPress={() =>
+              Alert.alert('Return parcel', 'Return this parcel to the courier or sender?', [
+                { style: 'cancel', text: 'Cancel' },
+                {
+                  onPress: () => transition.mutate('return'),
+                  style: 'destructive',
+                  text: 'Return',
+                },
+              ])
+            }
             secondaryLabel="पार्सल लौटाएं"
             variant="secondary"
           />
@@ -114,5 +146,11 @@ export default function ParcelDetailScreen() {
 
 const styles = StyleSheet.create({
   error: { color: colors.critical, fontSize: typography.label, lineHeight: 21 },
-  heading: { alignItems: "flex-start", flexDirection: "row", flexWrap: "wrap", gap: spacing.md, justifyContent: "space-between" }
+  heading: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    justifyContent: 'space-between',
+  },
 });

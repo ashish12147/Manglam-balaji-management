@@ -1,41 +1,41 @@
-export type DeviceStatus = "PENDING" | "ACTIVE" | "REVOKED" | "LOST" | "UNREGISTERED";
+export type DeviceStatus = 'PENDING' | 'ACTIVE' | 'REVOKED' | 'LOST' | 'UNREGISTERED';
 
-export type SyncStatus = "LOCAL_PENDING" | "SYNCING" | "SYNCED" | "CONFLICT" | "FAILED";
+export type SyncStatus = 'LOCAL_PENDING' | 'SYNCING' | 'SYNCED' | 'CONFLICT' | 'FAILED';
 
 export type VisitStatus =
-  | "DRAFT"
-  | "EXPECTED"
-  | "ARRIVED_AT_GATE"
-  | "AWAITING_APPROVAL"
-  | "APPROVED"
-  | "REJECTED"
-  | "APPROVAL_TIMED_OUT"
-  | "CHECKED_IN"
-  | "CHECKED_OUT"
-  | "CANCELLED"
-  | "EXPIRED";
+  | 'DRAFT'
+  | 'EXPECTED'
+  | 'ARRIVED_AT_GATE'
+  | 'AWAITING_APPROVAL'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'APPROVAL_TIMED_OUT'
+  | 'CHECKED_IN'
+  | 'CHECKED_OUT'
+  | 'CANCELLED'
+  | 'EXPIRED';
 
-export type VisitorCategory = "GUEST" | "DELIVERY" | "CAB" | "SERVICE_PROVIDER" | "OTHER";
+export type VisitorCategory = 'GUEST' | 'DELIVERY' | 'CAB' | 'SERVICE_PROVIDER' | 'OTHER';
 
 export type DailyHelpType =
-  | "MAID"
-  | "COOK"
-  | "DRIVER"
-  | "CLEANER"
-  | "NANNY"
-  | "DELIVERY_STAFF"
-  | "REGULAR_SERVICE_PROVIDER"
-  | "OTHER";
+  | 'MAID'
+  | 'COOK'
+  | 'DRIVER'
+  | 'CLEANER'
+  | 'NANNY'
+  | 'DELIVERY_STAFF'
+  | 'REGULAR_SERVICE_PROVIDER'
+  | 'OTHER';
 
 export type ParcelStatus =
-  | "EXPECTED"
-  | "ARRIVED"
-  | "HELD_AT_GATE"
-  | "COLLECTED"
-  | "RETURNED"
-  | "CANCELLED";
+  | 'EXPECTED'
+  | 'ARRIVED'
+  | 'HELD_AT_GATE'
+  | 'COLLECTED'
+  | 'RETURNED'
+  | 'CANCELLED';
 
-export type EmergencyStatus = "ACTIVE" | "ACKNOWLEDGED" | "RESPONDING" | "RESOLVED" | "FALSE_ALARM";
+export type EmergencyStatus = 'ACTIVE' | 'ACKNOWLEDGED' | 'RESPONDING' | 'RESOLVED' | 'FALSE_ALARM';
 
 export interface GuardIdentity {
   id: string;
@@ -77,7 +77,7 @@ export interface GuardContextResponse {
   activeGate: Gate | null;
   device: RegisteredDevice;
   gates: Gate[];
-  guard: Omit<GuardIdentity, "permissions"> & { permissions?: string[] };
+  guard: Omit<GuardIdentity, 'permissions'> & { permissions?: string[] };
   permissions: string[];
 }
 
@@ -90,7 +90,7 @@ export interface AuthTokens {
 export interface GuardSignInResponse extends AuthTokens {
   refreshTokenExpiresAt: string;
   sessionId: string;
-  tokenType: "Bearer";
+  tokenType: 'Bearer';
 }
 
 export interface FlatDirectoryItem {
@@ -109,7 +109,7 @@ export interface DailyHelpDirectoryItem {
   photoFileId?: string | null;
   allowedFlatLabels: string[];
   accessWindow?: string | null;
-  status: "ACTIVE" | "SUSPENDED" | "INACTIVE";
+  status: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE';
   version: number;
   snapshotExpiresAt?: string | null;
 }
@@ -136,7 +136,7 @@ export interface VisitSummary {
   id: string;
   visitorName: string;
   category: VisitorCategory;
-  flat: Pick<FlatDirectoryItem, "id" | "displayLabel">;
+  flat: Pick<FlatDirectoryItem, 'id' | 'displayLabel'>;
   status: VisitStatus;
   createdAt: string;
   arrivedAt?: string | null;
@@ -168,7 +168,7 @@ export interface DailyHelpAttendance {
   dailyHelpId: string;
   checkedInAt: string;
   checkedOutAt?: string | null;
-  status: "CHECKED_IN" | "CHECKED_OUT" | "VOIDED";
+  status: 'CHECKED_IN' | 'CHECKED_OUT' | 'VOIDED';
 }
 
 export interface DailyHelpDetail extends DailyHelpDirectoryItem {
@@ -177,7 +177,7 @@ export interface DailyHelpDetail extends DailyHelpDirectoryItem {
 
 export interface ParcelSummary {
   id: string;
-  flat: Pick<FlatDirectoryItem, "id" | "displayLabel">;
+  flat: Pick<FlatDirectoryItem, 'id' | 'displayLabel'>;
   courierName?: string | null;
   description?: string | null;
   status: ParcelStatus;
@@ -189,8 +189,8 @@ export interface ParcelSummary {
 
 export interface EmergencyAlert {
   id: string;
-  category: "MEDICAL" | "FIRE" | "SECURITY_THREAT" | "LIFT" | "OTHER";
-  flat: Pick<FlatDirectoryItem, "id" | "displayLabel">;
+  category: 'MEDICAL' | 'FIRE' | 'SECURITY_THREAT' | 'LIFT' | 'OTHER';
+  flat: Pick<FlatDirectoryItem, 'id' | 'displayLabel'>;
   residentDisplayName: string;
   status: EmergencyStatus;
   createdAt: string;
@@ -208,7 +208,7 @@ export interface EmergencyAlert {
 
 export interface ActivityEvent {
   id: string;
-  category: "VISITOR" | "DAILY_HELP" | "PARCEL" | "EMERGENCY" | "DEVICE" | "SYNC";
+  category: 'VISITOR' | 'DAILY_HELP' | 'PARCEL' | 'EMERGENCY' | 'DEVICE' | 'SYNC';
   title: string;
   detail: string;
   status: string;

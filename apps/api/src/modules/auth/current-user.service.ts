@@ -124,9 +124,7 @@ export class CurrentUserService {
             ) {
               return [];
             }
-            return assignment.role.permissionLinks.map(
-              (link) => link.permission.action,
-            );
+            return assignment.role.permissionLinks.map((link) => link.permission.action);
           }),
         ),
       ].sort();
@@ -196,16 +194,13 @@ export class CurrentUserService {
           sessionId: principal.sessionId,
           userId: principal.user.id,
         };
-        const claim = await this.journal.begin<{ readonly updated: true }>(
-          transaction,
-          {
-            actor,
-            idempotencyKey: context.idempotencyKey,
-            operation: 'account.profile.update',
-            request: input,
-            societyId: principal.societyId,
-          },
-        );
+        const claim = await this.journal.begin<{ readonly updated: true }>(transaction, {
+          actor,
+          idempotencyKey: context.idempotencyKey,
+          operation: 'account.profile.update',
+          request: input,
+          societyId: principal.societyId,
+        });
         if (claim.kind === 'replay') return;
 
         const user = await transaction.user.findFirst({

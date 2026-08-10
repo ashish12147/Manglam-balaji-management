@@ -1,8 +1,5 @@
 import type { Request } from 'express';
-import type {
-  AuthorizationActor,
-  PermissionAction,
-} from '@manglam/permissions';
+import type { AuthorizationActor, PermissionAction } from '@manglam/permissions';
 
 export interface MembershipView {
   readonly flatId: string;

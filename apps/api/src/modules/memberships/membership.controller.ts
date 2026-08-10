@@ -1,31 +1,15 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { cursorQuerySchema, uuidSchema } from '@manglam/validation';
 
 import { ZodValidationPipe } from '../../common/http/zod-validation.pipe.js';
-import {
-  CurrentPrincipal,
-  RequireAnyPermission,
-} from '../access/access.decorators.js';
+import { CurrentPrincipal, RequireAnyPermission } from '../access/access.decorators.js';
 import { AccessSessionGuard } from '../access/access-session.guard.js';
 import type { AuthenticatedPrincipal } from '../access/access.types.js';
 import { PermissionGuard } from '../access/permission.guard.js';
 import { success } from '../platform/api-response.js';
-import {
-  mutationRequestContext,
-  requestCorrelationId,
-} from '../platform/request-context.js';
+import { mutationRequestContext, requestCorrelationId } from '../platform/request-context.js';
 import {
   createFamilyMemberSchema,
   membershipDecisionSchema,
@@ -84,10 +68,7 @@ export class MembershipController {
     @Query(new ZodValidationPipe(cursorQuerySchema)) query: CursorQuery,
     @Req() request: Request,
   ): Promise<object> {
-    return success(
-      await this.memberships.listAll(principal, query),
-      requestCorrelationId(request),
-    );
+    return success(await this.memberships.listAll(principal, query), requestCorrelationId(request));
   }
 
   @Post('requests')

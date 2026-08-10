@@ -8,18 +8,8 @@ import { CurrentIdentityService } from './current-identity.service.js';
 import { PermissionGuard } from './permission.guard.js';
 
 @Module({
-  exports: [
-    AccessSessionGuard,
-    AuthorizationService,
-    CurrentIdentityService,
-    PermissionGuard,
-  ],
+  exports: [AccessSessionGuard, AuthorizationService, CurrentIdentityService, PermissionGuard],
   imports: [DatabaseModule, SecurityModule],
-  providers: [
-    AccessSessionGuard,
-    AuthorizationService,
-    CurrentIdentityService,
-    PermissionGuard,
-  ],
+  providers: [AccessSessionGuard, AuthorizationService, CurrentIdentityService, PermissionGuard],
 })
 export class AccessModule {}

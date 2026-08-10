@@ -72,9 +72,7 @@ export const updateFlatSchema = z
   .strict()
   .refine((value) => Object.keys(value).length > 0, 'At least one field is required.');
 
-export const createGateSchema = z
-  .object({ code: codeSchema, name: nameSchema })
-  .strict();
+export const createGateSchema = z.object({ code: codeSchema, name: nameSchema }).strict();
 
 export const updateGateSchema = z
   .object({

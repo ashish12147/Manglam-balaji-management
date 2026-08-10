@@ -4,10 +4,7 @@ export interface SuccessEnvelope<TData, TMeta = never> {
   readonly meta?: TMeta;
 }
 
-export function success<TData>(
-  data: TData,
-  correlationId: string,
-): SuccessEnvelope<TData> {
+export function success<TData>(data: TData, correlationId: string): SuccessEnvelope<TData> {
   return { correlationId, data };
 }
 

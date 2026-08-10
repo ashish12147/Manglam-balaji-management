@@ -1,15 +1,15 @@
-import * as Crypto from "expo-crypto";
+import * as Crypto from 'expo-crypto';
 
-import { ApiError, type ApiErrorBody } from "@/api/errors";
+import { ApiError, type ApiErrorBody } from '@/api/errors';
 import {
   idempotencyKeyForRetry,
   releaseIdempotencyKey,
-  retainIdempotencyKey
-} from "@/api/idempotency-retry";
-import { deviceFingerprintHeaders, protectedIdentityHeaders } from "@/api/request-contract";
-import { isDefinitiveRefreshFailure } from "@/auth/refresh-credentials";
-import { env } from "@/config/env";
-import type { AuthTokens } from "@/types/domain";
+  retainIdempotencyKey,
+} from '@/api/idempotency-retry';
+import { deviceFingerprintHeaders, protectedIdentityHeaders } from '@/api/request-contract';
+import { isDefinitiveRefreshFailure } from '@/auth/refresh-credentials';
+import { env } from '@/config/env';
+import type { AuthTokens } from '@/types/domain';
 
 interface AuthContext {
   accessToken: string | null;
@@ -31,7 +31,7 @@ export interface ApiRequestOptions {
   body?: unknown;
   headers?: Record<string, string>;
   idempotencyKey?: string;
-  method?: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
+  method?: 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT';
   query?: Record<string, boolean | number | string | null | undefined>;
   signal?: AbortSignal;
   timeoutMs?: number;
@@ -43,11 +43,11 @@ const missingAdapter: AuthAdapter = {
     deviceFingerprint: null,
     gateId: null,
     refreshIdempotencyKey: null,
-    refreshToken: null
+    refreshToken: null,
   }),
   onRefreshRejected: () => undefined,
   onSessionExpired: () => undefined,
-  onTokensRotated: () => undefined
+  onTokensRotated: () => undefined,
 };
 
 let authAdapter: AuthAdapter = missingAdapter;
@@ -57,18 +57,18 @@ export function configureApiAuth(adapter: AuthAdapter): void {
   authAdapter = adapter;
 }
 
-function makeUrl(path: string, query?: ApiRequestOptions["query"]): string {
+function makeUrl(path: string, query?: ApiRequestOptions['query']): string {
   if (!env.apiUrl) {
     throw new ApiError({
-      code: "APP_NOT_CONFIGURED",
-      message: "This app build is not connected to the society server.",
-      status: 0
+      code: 'APP_NOT_CONFIGURED',
+      message: 'This app build is not connected to the society server.',
+      status: 0,
     });
   }
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   const url = new URL(`${env.apiUrl}${normalizedPath}`);
   for (const [key, value] of Object.entries(query ?? {})) {
-    if (value !== null && value !== undefined && value !== "") {
+    if (value !== null && value !== undefined && value !== '') {
       url.searchParams.set(key, String(value));
     }
   }
@@ -78,23 +78,23 @@ function makeUrl(path: string, query?: ApiRequestOptions["query"]): string {
 async function idempotencyFingerprint(
   method: string,
   url: string,
-  serializedBody: string | undefined
+  serializedBody: string | undefined,
 ): Promise<string> {
   return Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
-    `${method}\u0000${url}\u0000${serializedBody ?? ""}`
+    `${method}\u0000${url}\u0000${serializedBody ?? ''}`,
   );
 }
 
 async function parseBody(response: Response): Promise<unknown> {
   if (response.status === 204) return null;
-  const contentType = response.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) return response.text();
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) return response.text();
   return response.json();
 }
 
 function unwrap<T>(body: unknown): T {
-  if (body && typeof body === "object" && "data" in body) {
+  if (body && typeof body === 'object' && 'data' in body) {
     return (body as { data: T }).data;
   }
   return body as T;
@@ -104,10 +104,10 @@ function toApiError(response: Response, body: unknown): ApiError {
   const envelope = body as ApiErrorBody;
   return new ApiError({
     code: envelope?.error?.code ?? `HTTP_${response.status}`,
-    correlationId: envelope?.error?.correlationId ?? response.headers.get("x-correlation-id"),
+    correlationId: envelope?.error?.correlationId ?? response.headers.get('x-correlation-id'),
     details: envelope?.error?.details,
-    message: envelope?.error?.message ?? "The society server rejected this operation.",
-    status: response.status
+    message: envelope?.error?.message ?? 'The society server rejected this operation.',
+    status: response.status,
   });
 }
 
@@ -115,15 +115,11 @@ async function rotateTokens(): Promise<AuthTokens> {
   if (refreshPromise) return refreshPromise;
   refreshPromise = (async () => {
     const context = await authAdapter.getContext();
-    if (
-      !context.refreshToken ||
-      !context.refreshIdempotencyKey ||
-      !context.deviceFingerprint
-    ) {
+    if (!context.refreshToken || !context.refreshIdempotencyKey || !context.deviceFingerprint) {
       throw new ApiError({
-        code: "SESSION_EXPIRED",
-        message: "Your guard shift has expired. Sign in again.",
-        status: 401
+        code: 'SESSION_EXPIRED',
+        message: 'Your guard shift has expired. Sign in again.',
+        status: 401,
       });
     }
 
@@ -131,30 +127,30 @@ async function rotateTokens(): Promise<AuthTokens> {
     const timeout = setTimeout(() => controller.abort(), 20_000);
     let response: Response;
     try {
-      response = await fetch(makeUrl("/auth/refresh"), {
+      response = await fetch(makeUrl('/auth/refresh'), {
         body: JSON.stringify({
           deviceFingerprint: context.deviceFingerprint,
-          refreshToken: context.refreshToken
+          refreshToken: context.refreshToken,
         }),
         headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
           ...deviceFingerprintHeaders(context.deviceFingerprint),
-          "Idempotency-Key": context.refreshIdempotencyKey,
-          "X-Correlation-ID": Crypto.randomUUID()
+          'Idempotency-Key': context.refreshIdempotencyKey,
+          'X-Correlation-ID': Crypto.randomUUID(),
         },
-        method: "POST",
-        signal: controller.signal
+        method: 'POST',
+        signal: controller.signal,
       });
     } catch (error) {
-      const timedOut = error instanceof Error && error.name === "AbortError";
+      const timedOut = error instanceof Error && error.name === 'AbortError';
       throw new ApiError({
-        code: timedOut ? "REQUEST_TIMEOUT" : "NETWORK_UNAVAILABLE",
+        code: timedOut ? 'REQUEST_TIMEOUT' : 'NETWORK_UNAVAILABLE',
         details: error,
         message: timedOut
-          ? "The server took too long to refresh this shift."
-          : "The society server could not be reached.",
-        status: 0
+          ? 'The server took too long to refresh this shift.'
+          : 'The society server could not be reached.',
+        status: 0,
       });
     } finally {
       clearTimeout(timeout);
@@ -184,29 +180,30 @@ async function rotateTokens(): Promise<AuthTokens> {
 async function performRequest<T>(
   path: string,
   options: ApiRequestOptions,
-  hasRetriedAfterRefresh: boolean
+  hasRetriedAfterRefresh: boolean,
 ): Promise<T> {
   const authRequired = options.auth !== false;
   const context = await authAdapter.getContext();
-  const method = options.method ?? (options.body === undefined ? "GET" : "POST");
+  const method = options.method ?? (options.body === undefined ? 'GET' : 'POST');
   const url = makeUrl(path, options.query);
   const serializedBody = options.body === undefined ? undefined : JSON.stringify(options.body);
   const fingerprint = options.idempotencyKey
     ? await idempotencyFingerprint(method, url, serializedBody)
     : null;
-  const effectiveIdempotencyKey = fingerprint && options.idempotencyKey
-    ? idempotencyKeyForRetry(fingerprint, options.idempotencyKey)
-    : options.idempotencyKey;
+  const effectiveIdempotencyKey =
+    fingerprint && options.idempotencyKey
+      ? idempotencyKeyForRetry(fingerprint, options.idempotencyKey)
+      : options.idempotencyKey;
   let identityHeaders: Record<string, string> = {};
   if (authRequired) {
     try {
       identityHeaders = protectedIdentityHeaders(context);
     } catch (error) {
       throw new ApiError({
-        code: "DEVICE_IDENTITY_MISSING",
+        code: 'DEVICE_IDENTITY_MISSING',
         details: error,
-        message: "This protected request has no registered device identity.",
-        status: 0
+        message: 'This protected request has no registered device identity.',
+        status: 0,
       });
     }
   }
@@ -214,21 +211,21 @@ async function performRequest<T>(
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 20_000);
   const externalAbort = () => controller.abort();
   if (options.signal?.aborted) controller.abort();
-  else options.signal?.addEventListener("abort", externalAbort, { once: true });
+  else options.signal?.addEventListener('abort', externalAbort, { once: true });
 
   try {
     const response = await fetch(url, {
       body: serializedBody,
       headers: {
         ...options.headers,
-        Accept: "application/json",
-        ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
-        "X-Correlation-ID": Crypto.randomUUID(),
+        Accept: 'application/json',
+        ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        'X-Correlation-ID': Crypto.randomUUID(),
         ...identityHeaders,
-        ...(effectiveIdempotencyKey ? { "Idempotency-Key": effectiveIdempotencyKey } : {})
+        ...(effectiveIdempotencyKey ? { 'Idempotency-Key': effectiveIdempotencyKey } : {}),
       },
       method,
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     if (response.status === 401 && authRequired) {
@@ -242,7 +239,7 @@ async function performRequest<T>(
     const body = await parseBody(response);
     if (fingerprint) {
       const errorCode = (body as ApiErrorBody)?.error?.code;
-      if (response.status === 409 && errorCode === "IDEMPOTENCY_REQUEST_IN_PROGRESS")
+      if (response.status === 409 && errorCode === 'IDEMPOTENCY_REQUEST_IN_PROGRESS')
         retainIdempotencyKey(fingerprint, effectiveIdempotencyKey!);
       else releaseIdempotencyKey(fingerprint);
     }
@@ -250,33 +247,39 @@ async function performRequest<T>(
     return unwrap<T>(body);
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    const aborted = error instanceof Error && error.name === "AbortError";
+    const aborted = error instanceof Error && error.name === 'AbortError';
     if (fingerprint && effectiveIdempotencyKey)
       retainIdempotencyKey(fingerprint, effectiveIdempotencyKey);
     throw new ApiError({
-      code: aborted ? "REQUEST_TIMEOUT" : "NETWORK_UNAVAILABLE",
+      code: aborted ? 'REQUEST_TIMEOUT' : 'NETWORK_UNAVAILABLE',
       details: error,
       message: aborted
-        ? "The server took too long to respond. Check the connection and try again."
-        : "The society server could not be reached.",
-      status: 0
+        ? 'The server took too long to respond. Check the connection and try again.'
+        : 'The society server could not be reached.',
+      status: 0,
     });
   } finally {
     clearTimeout(timeout);
-    options.signal?.removeEventListener("abort", externalAbort);
+    options.signal?.removeEventListener('abort', externalAbort);
   }
 }
 
 export const api = {
-  delete: <T>(path: string, options: Omit<ApiRequestOptions, "method"> = {}) =>
-    performRequest<T>(path, { ...options, method: "DELETE" }, false),
-  get: <T>(path: string, options: Omit<ApiRequestOptions, "method"> = {}) =>
-    performRequest<T>(path, { ...options, method: "GET" }, false),
-  patch: <T>(path: string, body: unknown, options: Omit<ApiRequestOptions, "body" | "method"> = {}) =>
-    performRequest<T>(path, { ...options, body, method: "PATCH" }, false),
-  post: <T>(path: string, body?: unknown, options: Omit<ApiRequestOptions, "body" | "method"> = {}) =>
-    performRequest<T>(path, { ...options, body, method: "POST" }, false),
-  put: <T>(path: string, body: unknown, options: Omit<ApiRequestOptions, "body" | "method"> = {}) =>
-    performRequest<T>(path, { ...options, body, method: "PUT" }, false),
-  refresh: rotateTokens
+  delete: <T>(path: string, options: Omit<ApiRequestOptions, 'method'> = {}) =>
+    performRequest<T>(path, { ...options, method: 'DELETE' }, false),
+  get: <T>(path: string, options: Omit<ApiRequestOptions, 'method'> = {}) =>
+    performRequest<T>(path, { ...options, method: 'GET' }, false),
+  patch: <T>(
+    path: string,
+    body: unknown,
+    options: Omit<ApiRequestOptions, 'body' | 'method'> = {},
+  ) => performRequest<T>(path, { ...options, body, method: 'PATCH' }, false),
+  post: <T>(
+    path: string,
+    body?: unknown,
+    options: Omit<ApiRequestOptions, 'body' | 'method'> = {},
+  ) => performRequest<T>(path, { ...options, body, method: 'POST' }, false),
+  put: <T>(path: string, body: unknown, options: Omit<ApiRequestOptions, 'body' | 'method'> = {}) =>
+    performRequest<T>(path, { ...options, body, method: 'PUT' }, false),
+  refresh: rotateTokens,
 };

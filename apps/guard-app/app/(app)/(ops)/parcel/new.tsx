@@ -1,27 +1,27 @@
-import * as Crypto from "expo-crypto";
-import { PackagePlus, WifiOff } from "lucide-react-native";
-import { Controller, useForm } from "react-hook-form";
-import { useRouter } from "expo-router";
-import { StyleSheet, Text } from "react-native";
-import { useState } from "react";
-import { z } from "zod";
+import * as Crypto from 'expo-crypto';
+import { PackagePlus, WifiOff } from 'lucide-react-native';
+import { Controller, useForm } from 'react-hook-form';
+import { useRouter } from 'expo-router';
+import { StyleSheet, Text } from 'react-native';
+import { useState } from 'react';
+import { z } from 'zod';
 
-import { endpoints } from "@/api/endpoints";
-import { uploadPrivateImage, type LocalImage } from "@/api/uploads";
-import { ActionButton, Field } from "@/components/Controls";
-import { FlatSearch } from "@/components/FlatSearch";
-import { PhotoCapture } from "@/components/PhotoCapture";
-import { Screen } from "@/components/Screen";
-import { StatePanel } from "@/components/StatePanel";
-import { PageTitle } from "@/components/Typography";
-import { useConnectivity } from "@/connectivity/connectivity-context";
-import { colors, typography } from "@/theme/tokens";
-import type { FlatDirectoryItem } from "@/types/domain";
-import { zodFormResolver } from "@/utils/zod-form-resolver";
+import { endpoints } from '@/api/endpoints';
+import { uploadPrivateImage, type LocalImage } from '@/api/uploads';
+import { ActionButton, Field } from '@/components/Controls';
+import { FlatSearch } from '@/components/FlatSearch';
+import { PhotoCapture } from '@/components/PhotoCapture';
+import { Screen } from '@/components/Screen';
+import { StatePanel } from '@/components/StatePanel';
+import { PageTitle } from '@/components/Typography';
+import { useConnectivity } from '@/connectivity/connectivity-context';
+import { colors, typography } from '@/theme/tokens';
+import type { FlatDirectoryItem } from '@/types/domain';
+import { zodFormResolver } from '@/utils/zod-form-resolver';
 
 const schema = z.object({
   courierName: z.string().trim().max(100),
-  description: z.string().trim().min(2, "Enter a short parcel description.").max(200)
+  description: z.string().trim().min(2, 'Enter a short parcel description.').max(200),
 });
 
 export default function NewParcelScreen() {
@@ -33,43 +33,46 @@ export default function NewParcelScreen() {
     control,
     handleSubmit,
     setError,
-    formState: { errors, isSubmitting }
+    formState: { errors, isSubmitting },
   } = useForm<z.infer<typeof schema>>({
-    defaultValues: { courierName: "", description: "" },
-    resolver: zodFormResolver(schema)
+    defaultValues: { courierName: '', description: '' },
+    resolver: zodFormResolver(schema),
   });
 
   const submit = handleSubmit(async (values) => {
     if (!connectivity.isOnline) {
-      setError("root", {
-        message: "Reconnect before recording a parcel. Parcel holds are not accepted by the offline protocol."
+      setError('root', {
+        message:
+          'Reconnect before recording a parcel. Parcel holds are not accepted by the offline protocol.',
       });
       return;
     }
     if (!flat) {
-      setError("root", { message: "Select the destination flat." });
+      setError('root', { message: 'Select the destination flat.' });
       return;
     }
     try {
-      const uploadedPhoto = photo ? await uploadPrivateImage(photo, "PARCEL_PHOTO") : undefined;
+      const uploadedPhoto = photo ? await uploadPrivateImage(photo, 'PARCEL_PHOTO') : undefined;
       const parcel = await endpoints.createParcel(
         {
           courierName: values.courierName.trim() || undefined,
           description: values.description.trim(),
           flatId: flat.id,
-          photoFileId: uploadedPhoto?.fileId
+          photoFileId: uploadedPhoto?.fileId,
         },
-        Crypto.randomUUID()
+        Crypto.randomUUID(),
       );
       router.replace({
-        pathname: "/parcel/[id]",
+        pathname: '/parcel/[id]',
         params: {
           id: parcel.id,
-          ...(uploadedPhoto ? { uploadScanStatus: uploadedPhoto.scanStatus } : {})
-        }
+          ...(uploadedPhoto ? { uploadScanStatus: uploadedPhoto.scanStatus } : {}),
+        },
       });
     } catch (caught) {
-      setError("root", { message: caught instanceof Error ? caught.message : "Parcel recording failed." });
+      setError('root', {
+        message: caught instanceof Error ? caught.message : 'Parcel recording failed.',
+      });
     }
   });
 
@@ -117,20 +120,25 @@ export default function NewParcelScreen() {
           />
         )}
       />
-      <PhotoCapture disabled={!connectivity.isOnline} label="Parcel photo / पार्सल फोटो" onChange={setPhoto} value={photo} />
+      <PhotoCapture
+        disabled={!connectivity.isOnline}
+        label="Parcel photo / पार्सल फोटो"
+        onChange={setPhoto}
+        value={photo}
+      />
       {errors.root?.message ? <Text style={styles.error}>{errors.root.message}</Text> : null}
       <ActionButton
         disabled={!connectivity.isOnline}
         icon={connectivity.isOnline ? PackagePlus : WifiOff}
-        label={connectivity.isOnline ? "Record held parcel" : "Reconnect to record parcel"}
+        label={connectivity.isOnline ? 'Record held parcel' : 'Reconnect to record parcel'}
         loading={isSubmitting}
         onPress={() => void submit()}
-        secondaryLabel={connectivity.isOnline ? "पार्सल दर्ज करें" : "इंटरनेट से जुड़ें"}
+        secondaryLabel={connectivity.isOnline ? 'पार्सल दर्ज करें' : 'इंटरनेट से जुड़ें'}
       />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  error: { color: colors.critical, fontSize: typography.label, lineHeight: 21 }
+  error: { color: colors.critical, fontSize: typography.label, lineHeight: 21 },
 });

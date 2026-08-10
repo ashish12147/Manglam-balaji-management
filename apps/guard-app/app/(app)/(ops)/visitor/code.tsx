@@ -1,21 +1,21 @@
-import * as Crypto from "expo-crypto";
-import { Controller, useForm } from "react-hook-form";
-import { ScanLine } from "lucide-react-native";
-import { useRouter } from "expo-router";
-import { Text } from "react-native";
-import { z } from "zod";
+import * as Crypto from 'expo-crypto';
+import { Controller, useForm } from 'react-hook-form';
+import { ScanLine } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Text } from 'react-native';
+import { z } from 'zod';
 
-import { endpoints } from "@/api/endpoints";
-import { ActionButton, Field } from "@/components/Controls";
-import { Screen } from "@/components/Screen";
-import { StatePanel } from "@/components/StatePanel";
-import { PageTitle } from "@/components/Typography";
-import { useConnectivity } from "@/connectivity/connectivity-context";
-import { colors, typography } from "@/theme/tokens";
-import { zodFormResolver } from "@/utils/zod-form-resolver";
+import { endpoints } from '@/api/endpoints';
+import { ActionButton, Field } from '@/components/Controls';
+import { Screen } from '@/components/Screen';
+import { StatePanel } from '@/components/StatePanel';
+import { PageTitle } from '@/components/Typography';
+import { useConnectivity } from '@/connectivity/connectivity-context';
+import { colors, typography } from '@/theme/tokens';
+import { zodFormResolver } from '@/utils/zod-form-resolver';
 
 const schema = z.object({
-  code: z.string().trim().min(6, "Enter the visitor code.").max(128, "The code is too long.")
+  code: z.string().trim().min(6, 'Enter the visitor code.').max(128, 'The code is too long.'),
 });
 
 export default function VisitorCodeScreen() {
@@ -25,8 +25,11 @@ export default function VisitorCodeScreen() {
     control,
     handleSubmit,
     setError,
-    formState: { errors, isSubmitting }
-  } = useForm<z.infer<typeof schema>>({ defaultValues: { code: "" }, resolver: zodFormResolver(schema) });
+    formState: { errors, isSubmitting },
+  } = useForm<z.infer<typeof schema>>({
+    defaultValues: { code: '' },
+    resolver: zodFormResolver(schema),
+  });
   if (!connectivity.isOnline) {
     return (
       <Screen>
@@ -42,11 +45,13 @@ export default function VisitorCodeScreen() {
     try {
       const visit = await endpoints.verifyVisitorCode(
         code.trim().toUpperCase(),
-        Crypto.randomUUID()
+        Crypto.randomUUID(),
       );
-      router.replace({ pathname: "/visitor/[id]", params: { id: visit.id } });
+      router.replace({ pathname: '/visitor/[id]', params: { id: visit.id } });
     } catch (caught) {
-      setError("root", { message: caught instanceof Error ? caught.message : "Code verification failed." });
+      setError('root', {
+        message: caught instanceof Error ? caught.message : 'Code verification failed.',
+      });
     }
   });
   return (
@@ -72,7 +77,10 @@ export default function VisitorCodeScreen() {
         )}
       />
       {errors.root?.message ? (
-        <Text accessibilityLiveRegion="polite" style={{ color: colors.critical, fontSize: typography.label }}>
+        <Text
+          accessibilityLiveRegion="polite"
+          style={{ color: colors.critical, fontSize: typography.label }}
+        >
           {errors.root.message}
         </Text>
       ) : null}

@@ -8,3 +8,5 @@ playwright-report
 test-results
 pnpm-lock.yaml
 implementation-plan.md
+packages/database/src/generated
+apps/admin-web/next-env.d.ts

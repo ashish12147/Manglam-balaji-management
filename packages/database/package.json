@@ -31,7 +31,7 @@
   ],
   "scripts": {
     "build": "pnpm generate && tsc -p tsconfig.build.json",
-    "clean": "rimraf dist src/generated coverage",
+    "clean": "rimraf dist src/generated coverage tsconfig.build.tsbuildinfo tsconfig.tsbuildinfo",
     "format": "prisma format",
     "generate": "prisma generate",
     "lint": "pnpm generate && tsc -p tsconfig.json --noEmit",

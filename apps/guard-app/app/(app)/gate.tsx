@@ -1,15 +1,15 @@
-import { DoorOpen, LogOut, MapPin, RefreshCw } from "lucide-react-native";
-import { Redirect, useRouter } from "expo-router";
-import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { DoorOpen, LogOut, MapPin, RefreshCw } from 'lucide-react-native';
+import { Redirect, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { useSession } from "@/auth/session-context";
-import { ActionButton } from "@/components/Controls";
-import { StatePanel } from "@/components/StatePanel";
-import { Screen } from "@/components/Screen";
-import { PageTitle } from "@/components/Typography";
-import { colors, radii, spacing, typography } from "@/theme/tokens";
-import type { Gate } from "@/types/domain";
+import { useSession } from '@/auth/session-context';
+import { ActionButton } from '@/components/Controls';
+import { StatePanel } from '@/components/StatePanel';
+import { Screen } from '@/components/Screen';
+import { PageTitle } from '@/components/Typography';
+import { colors, radii, spacing, typography } from '@/theme/tokens';
+import type { Gate } from '@/types/domain';
 
 export default function GateScreen() {
   const router = useRouter();
@@ -18,16 +18,16 @@ export default function GateScreen() {
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const gates = session.metadata?.gates ?? [];
-  if (session.metadata?.device.status !== "ACTIVE") return <Redirect href="/device" />;
+  if (session.metadata?.device.status !== 'ACTIVE') return <Redirect href="/device" />;
 
   async function selectGate(gate: Gate) {
     setSelecting(gate.id);
     setSelectionError(null);
     try {
       await session.selectGate(gate);
-      router.replace("/home");
+      router.replace('/home');
     } catch (caught) {
-      setSelectionError(caught instanceof Error ? caught.message : "Gate selection failed.");
+      setSelectionError(caught instanceof Error ? caught.message : 'Gate selection failed.');
     } finally {
       setSelecting(null);
     }
@@ -39,7 +39,9 @@ export default function GateScreen() {
     try {
       await session.refreshContext();
     } catch (caught) {
-      setSelectionError(caught instanceof Error ? caught.message : "Gate assignments could not be refreshed.");
+      setSelectionError(
+        caught instanceof Error ? caught.message : 'Gate assignments could not be refreshed.',
+      );
     } finally {
       setRefreshing(false);
     }
@@ -61,7 +63,9 @@ export default function GateScreen() {
       <View style={styles.gates}>
         {gates.map((gate) => (
           <View key={gate.id} style={styles.gateRow}>
-            <View style={styles.gateIcon}><DoorOpen color={colors.primary} size={28} /></View>
+            <View style={styles.gateIcon}>
+              <DoorOpen color={colors.primary} size={28} />
+            </View>
             <View style={styles.gateInfo}>
               <Text style={styles.gateName}>{gate.name}</Text>
               <Text style={styles.gateCode}>{gate.code}</Text>
@@ -77,9 +81,26 @@ export default function GateScreen() {
           </View>
         ))}
       </View>
-      {selectionError ? <Text accessibilityLiveRegion="polite" style={styles.error}>{selectionError}</Text> : null}
-      <ActionButton icon={RefreshCw} label="Refresh assignments" loading={refreshing} onPress={() => void refresh()} secondaryLabel="असाइनमेंट अपडेट करें" variant="secondary" />
-      <ActionButton icon={LogOut} label="Sign out" onPress={() => void session.signOut()} secondaryLabel="साइन आउट" variant="quiet" />
+      {selectionError ? (
+        <Text accessibilityLiveRegion="polite" style={styles.error}>
+          {selectionError}
+        </Text>
+      ) : null}
+      <ActionButton
+        icon={RefreshCw}
+        label="Refresh assignments"
+        loading={refreshing}
+        onPress={() => void refresh()}
+        secondaryLabel="असाइनमेंट अपडेट करें"
+        variant="secondary"
+      />
+      <ActionButton
+        icon={LogOut}
+        label="Sign out"
+        onPress={() => void session.signOut()}
+        secondaryLabel="साइन आउट"
+        variant="quiet"
+      />
     </Screen>
   );
 }
@@ -88,9 +109,26 @@ const styles = StyleSheet.create({
   choose: { minWidth: 128 },
   error: { color: colors.critical, fontSize: typography.label, lineHeight: 21 },
   gateCode: { color: colors.muted, fontSize: typography.label },
-  gateIcon: { alignItems: "center", backgroundColor: colors.primarySoft, borderRadius: radii.md, height: 52, justifyContent: "center", width: 52 },
+  gateIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.primarySoft,
+    borderRadius: radii.md,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+  },
   gateInfo: { flex: 1, minWidth: 0 },
-  gateName: { color: colors.ink, fontSize: typography.title, fontWeight: "700" },
-  gateRow: { alignItems: "center", backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radii.md, borderWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: spacing.md, padding: spacing.md },
-  gates: { gap: spacing.md }
+  gateName: { color: colors.ink, fontSize: typography.title, fontWeight: '700' },
+  gateRow: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  gates: { gap: spacing.md },
 });

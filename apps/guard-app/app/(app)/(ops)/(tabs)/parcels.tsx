@@ -1,27 +1,27 @@
-import { useQuery } from "@tanstack/react-query";
-import { Package, PackageCheck, Plus } from "lucide-react-native";
-import { useRouter } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { useQuery } from '@tanstack/react-query';
+import { Package, PackageCheck, Plus } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
-import { endpoints } from "@/api/endpoints";
-import { ActionButton } from "@/components/Controls";
-import { RecordItem } from "@/components/Records";
-import { Screen } from "@/components/Screen";
-import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/StatePanel";
-import { PageTitle, SectionTitle } from "@/components/Typography";
-import { useConnectivity } from "@/connectivity/connectivity-context";
-import { spacing } from "@/theme/tokens";
-import { formatDateTime } from "@/utils/date";
-import { humanizeConstant } from "@/utils/text";
+import { endpoints } from '@/api/endpoints';
+import { ActionButton } from '@/components/Controls';
+import { RecordItem } from '@/components/Records';
+import { Screen } from '@/components/Screen';
+import { ErrorPanel, LoadingPanel, StatePanel } from '@/components/StatePanel';
+import { PageTitle, SectionTitle } from '@/components/Typography';
+import { useConnectivity } from '@/connectivity/connectivity-context';
+import { spacing } from '@/theme/tokens';
+import { formatDateTime } from '@/utils/date';
+import { humanizeConstant } from '@/utils/text';
 
 export default function ParcelsScreen() {
   const router = useRouter();
   const connectivity = useConnectivity();
   const parcels = useQuery({
     enabled: connectivity.isOnline,
-    queryFn: () => endpoints.parcelList("ARRIVED,HELD_AT_GATE"),
-    queryKey: ["parcels", "held"],
-    refetchInterval: 15_000
+    queryFn: () => endpoints.parcelList('ARRIVED,HELD_AT_GATE'),
+    queryKey: ['parcels', 'held'],
+    refetchInterval: 15_000,
   });
   return (
     <Screen onRefresh={() => void parcels.refetch()} refreshing={parcels.isRefetching}>
@@ -33,7 +33,7 @@ export default function ParcelsScreen() {
           <ActionButton
             icon={Plus}
             label="Hold parcel"
-            onPress={() => router.push("/parcel/new")}
+            onPress={() => router.push('/parcel/new')}
             secondaryLabel="पार्सल रखें"
           />
         </View>
@@ -42,7 +42,7 @@ export default function ParcelsScreen() {
             disabled={!connectivity.isOnline}
             icon={PackageCheck}
             label="Collection code"
-            onPress={() => router.push("/parcel/verify")}
+            onPress={() => router.push('/parcel/verify')}
             secondaryLabel="कलेक्शन कोड"
             variant="secondary"
           />
@@ -58,21 +58,24 @@ export default function ParcelsScreen() {
       ) : parcels.isLoading ? (
         <LoadingPanel />
       ) : parcels.isError ? (
-        <ErrorPanel message={(parcels.error as Error).message} onRetry={() => void parcels.refetch()} />
+        <ErrorPanel
+          message={(parcels.error as Error).message}
+          onRetry={() => void parcels.refetch()}
+        />
       ) : parcels.data?.items.length === 0 ? (
         <StatePanel detail="No parcel is currently held at this gate." title="No held parcels" />
       ) : (
         <View style={styles.records}>
           {parcels.data?.items.map((parcel) => (
             <RecordItem
-              detail={`${parcel.flat.displayLabel} • ${parcel.courierName ?? "Courier not supplied"}`}
+              detail={`${parcel.flat.displayLabel} • ${parcel.courierName ?? 'Courier not supplied'}`}
               icon={Package}
               key={parcel.id}
               meta={formatDateTime(parcel.heldAt ?? parcel.createdAt)}
-              onPress={() => router.push({ pathname: "/parcel/[id]", params: { id: parcel.id } })}
+              onPress={() => router.push({ pathname: '/parcel/[id]', params: { id: parcel.id } })}
               status={humanizeConstant(parcel.status)}
-              statusTone={parcel.status === "HELD_AT_GATE" ? "warning" : "info"}
-              title={parcel.description ?? "Parcel"}
+              statusTone={parcel.status === 'HELD_AT_GATE' ? 'warning' : 'info'}
+              title={parcel.description ?? 'Parcel'}
             />
           ))}
         </View>
@@ -84,14 +87,14 @@ export default function ParcelsScreen() {
 const styles = StyleSheet.create({
   actionCell: {
     flex: 1,
-    minWidth: 160
+    minWidth: 160,
   },
   actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
   records: {
-    gap: spacing.sm
-  }
+    gap: spacing.sm,
+  },
 });

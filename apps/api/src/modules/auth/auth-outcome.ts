@@ -19,19 +19,14 @@ export interface StoredSuccessOutcome<T> {
   readonly ok: true;
 }
 
+export type StoredOutcome<T> = StoredFailureOutcome | StoredSuccessOutcome<T>;
 
-export type StoredOutcome<T> =
-  | StoredFailureOutcome
-  | StoredSuccessOutcome<T>;
-
-export function failedOutcome<T>(
-  failure: {
-    readonly code: string;
-    readonly details?: Record<string, unknown> | undefined;
-    readonly message?: string | undefined;
-    readonly status?: number | undefined;
-  },
-): StoredFailureOutcome {
+export function failedOutcome<T>(failure: {
+  readonly code: string;
+  readonly details?: Record<string, unknown> | undefined;
+  readonly message?: string | undefined;
+  readonly status?: number | undefined;
+}): StoredFailureOutcome {
   return {
     error: {
       code: failure.code,

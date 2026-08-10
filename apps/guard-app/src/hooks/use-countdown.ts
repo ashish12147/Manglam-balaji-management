@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
-import { secondsUntil } from "@/utils/date";
+import { secondsUntil } from '@/utils/date';
 
 export function useCountdown(expiresAt: string | null | undefined): number {
   const [, setTick] = useState(0);
@@ -14,5 +14,5 @@ export function useCountdown(expiresAt: string | null | undefined): number {
 
 export function formatCountdown(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
-  return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }

@@ -9,13 +9,11 @@ import type {
 export const PUBLIC_ROUTE = Symbol('PUBLIC_ROUTE');
 export const PERMISSION_REQUIREMENTS = Symbol('PERMISSION_REQUIREMENTS');
 
-export const Public = (): MethodDecorator & ClassDecorator =>
-  SetMetadata(PUBLIC_ROUTE, true);
+export const Public = (): MethodDecorator & ClassDecorator => SetMetadata(PUBLIC_ROUTE, true);
 
 export const RequireAnyPermission = (
   ...requirements: readonly PermissionRequirement[]
-): MethodDecorator & ClassDecorator =>
-  SetMetadata(PERMISSION_REQUIREMENTS, requirements);
+): MethodDecorator & ClassDecorator => SetMetadata(PERMISSION_REQUIREMENTS, requirements);
 
 export const CurrentPrincipal = createParamDecorator(
   (_data: unknown, context: ExecutionContext): AuthenticatedPrincipal =>

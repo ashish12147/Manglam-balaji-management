@@ -1,29 +1,29 @@
-import * as Crypto from "expo-crypto";
-import * as Device from "expo-device";
-import * as SecureStore from "expo-secure-store";
+import * as Crypto from 'expo-crypto';
+import * as Device from 'expo-device';
+import * as SecureStore from 'expo-secure-store';
 
 import {
   createRefreshCredentials,
   parseRefreshCredentials,
-  type RefreshCredentials
-} from "@/auth/refresh-credentials";
-import type { DeviceIdentity, GuardSessionMetadata } from "@/types/domain";
+  type RefreshCredentials,
+} from '@/auth/refresh-credentials';
+import type { DeviceIdentity, GuardSessionMetadata } from '@/types/domain';
 
-const DEVICE_KEY = "mb.guard.device.v1";
-const LEGACY_REFRESH_TOKEN_KEY = "mb.guard.refresh-token.v1";
-const REFRESH_CREDENTIALS_KEY = "mb.guard.refresh-credentials.v2";
-const SESSION_KEY = "mb.guard.session.v1";
-const DATABASE_KEY = "mb.guard.database-key.v1";
+const DEVICE_KEY = 'mb.guard.device.v1';
+const LEGACY_REFRESH_TOKEN_KEY = 'mb.guard.refresh-token.v1';
+const REFRESH_CREDENTIALS_KEY = 'mb.guard.refresh-credentials.v2';
+const SESSION_KEY = 'mb.guard.session.v1';
+const DATABASE_KEY = 'mb.guard.database-key.v1';
 
 const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/i;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const secureOptions: SecureStore.SecureStoreOptions = {
-  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY
+  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 };
 
 function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
 }
 
 async function randomSecret(byteLength: number): Promise<string> {
@@ -38,7 +38,7 @@ async function writeRefreshCredentials(credentials: RefreshCredentials): Promise
   await SecureStore.setItemAsync(
     REFRESH_CREDENTIALS_KEY,
     JSON.stringify(credentials),
-    secureOptions
+    secureOptions,
   );
 }
 
@@ -50,7 +50,7 @@ export async function getOrCreateDeviceIdentity(): Promise<DeviceIdentity> {
       if (
         UUID_PATTERN.test(parsed.clientDeviceId) &&
         FINGERPRINT_PATTERN.test(parsed.installationSecret) &&
-        typeof parsed.label === "string" &&
+        typeof parsed.label === 'string' &&
         parsed.label.trim().length > 0
       ) {
         return parsed;
@@ -64,7 +64,7 @@ export async function getOrCreateDeviceIdentity(): Promise<DeviceIdentity> {
   const identity: DeviceIdentity = {
     clientDeviceId: Crypto.randomUUID(),
     installationSecret: await randomSecret(32),
-    label: Device.deviceName ?? Device.modelName ?? "Guard device"
+    label: Device.deviceName ?? Device.modelName ?? 'Guard device',
   };
   await SecureStore.setItemAsync(DEVICE_KEY, JSON.stringify(identity), secureOptions);
   return identity;
@@ -99,7 +99,7 @@ export async function saveRefreshToken(token: string): Promise<RefreshCredential
 }
 
 export async function renewRefreshIdempotencyKey(
-  expectedRefreshToken: string
+  expectedRefreshToken: string,
 ): Promise<RefreshCredentials | null> {
   const current = await loadRefreshCredentials();
   if (!current || current.refreshToken !== expectedRefreshToken) return current;
@@ -127,7 +127,7 @@ export async function clearSessionCredentials(): Promise<void> {
   await Promise.all([
     SecureStore.deleteItemAsync(REFRESH_CREDENTIALS_KEY, secureOptions),
     SecureStore.deleteItemAsync(LEGACY_REFRESH_TOKEN_KEY, secureOptions),
-    SecureStore.deleteItemAsync(SESSION_KEY, secureOptions)
+    SecureStore.deleteItemAsync(SESSION_KEY, secureOptions),
   ]);
 }
 
@@ -143,6 +143,6 @@ export async function clearDeviceSecrets(): Promise<void> {
   await Promise.all([
     clearSessionCredentials(),
     SecureStore.deleteItemAsync(DEVICE_KEY, secureOptions),
-    SecureStore.deleteItemAsync(DATABASE_KEY, secureOptions)
+    SecureStore.deleteItemAsync(DATABASE_KEY, secureOptions),
   ]);
 }

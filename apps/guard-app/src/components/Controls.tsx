@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react-native";
+import type { LucideIcon } from 'lucide-react-native';
 import {
   ActivityIndicator,
   Pressable,
@@ -7,19 +7,19 @@ import {
   TextInput,
   View,
   type KeyboardTypeOptions,
-  type TextInputProps
-} from "react-native";
+  type TextInputProps,
+} from 'react-native';
 
-import { colors, control, radii, spacing, typography } from "@/theme/tokens";
+import { colors, control, radii, spacing, typography } from '@/theme/tokens';
 
-type ButtonVariant = "primary" | "secondary" | "danger" | "warning" | "quiet";
+type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'warning' | 'quiet';
 
 const buttonColors: Record<ButtonVariant, { background: string; border: string; text: string }> = {
   danger: { background: colors.critical, border: colors.critical, text: colors.white },
   primary: { background: colors.primary, border: colors.primary, text: colors.white },
-  quiet: { background: "transparent", border: "transparent", text: colors.primary },
+  quiet: { background: 'transparent', border: 'transparent', text: colors.primary },
   secondary: { background: colors.surface, border: colors.border, text: colors.ink },
-  warning: { background: colors.warning, border: colors.warning, text: colors.white }
+  warning: { background: colors.warning, border: colors.warning, text: colors.white },
 };
 
 export function ActionButton({
@@ -31,7 +31,7 @@ export function ActionButton({
   onPress,
   secondaryLabel,
   testID,
-  variant = "primary"
+  variant = 'primary',
 }: {
   accessibilityLabel?: string;
   disabled?: boolean;
@@ -47,7 +47,7 @@ export function ActionButton({
   const inactive = disabled || loading;
   return (
     <Pressable
-      accessibilityLabel={accessibilityLabel ?? [label, secondaryLabel].filter(Boolean).join(", ")}
+      accessibilityLabel={accessibilityLabel ?? [label, secondaryLabel].filter(Boolean).join(', ')}
       accessibilityRole="button"
       accessibilityState={{ busy: loading, disabled: inactive }}
       disabled={inactive}
@@ -56,7 +56,7 @@ export function ActionButton({
         styles.button,
         { backgroundColor: palette.background, borderColor: palette.border },
         pressed && !inactive ? styles.pressed : null,
-        inactive ? styles.disabled : null
+        inactive ? styles.disabled : null,
       ]}
       testID={testID}
     >
@@ -83,7 +83,7 @@ export function IconButton({
   accessibilityLabel,
   disabled = false,
   icon: Icon,
-  onPress
+  onPress,
 }: {
   accessibilityLabel: string;
   disabled?: boolean;
@@ -122,19 +122,23 @@ export function Field({
   onChangeText: (value: string) => void;
   required?: boolean;
   value: string;
-} & Omit<TextInputProps, "keyboardType" | "onChangeText" | "value">) {
+} & Omit<TextInputProps, 'keyboardType' | 'onChangeText' | 'value'>) {
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.fieldLabel}>
         {label}
-        {required ? " *" : ""}
+        {required ? ' *' : ''}
       </Text>
       <TextInput
         accessibilityLabel={label}
         keyboardType={keyboardType}
         onChangeText={onChangeText}
         placeholderTextColor={colors.disabled}
-        style={[styles.input, inputProps.multiline ? styles.multiline : null, error ? styles.inputError : null]}
+        style={[
+          styles.input,
+          inputProps.multiline ? styles.multiline : null,
+          error ? styles.inputError : null,
+        ]}
         value={value}
         {...inputProps}
       />
@@ -153,7 +157,7 @@ export function ChoiceGroup<T extends string>({
   label,
   onChange,
   options,
-  value
+  value,
 }: {
   label: string;
   onChange: (value: T) => void;
@@ -168,7 +172,7 @@ export function ChoiceGroup<T extends string>({
           const selected = value === option.value;
           return (
             <Pressable
-              accessibilityLabel={[option.label, option.secondaryLabel].filter(Boolean).join(", ")}
+              accessibilityLabel={[option.label, option.secondaryLabel].filter(Boolean).join(', ')}
               accessibilityRole="radio"
               accessibilityState={{ checked: selected }}
               key={option.value}
@@ -176,14 +180,16 @@ export function ChoiceGroup<T extends string>({
               style={({ pressed }) => [
                 styles.choice,
                 selected ? styles.choiceSelected : null,
-                pressed ? styles.pressed : null
+                pressed ? styles.pressed : null,
               ]}
             >
               <Text style={[styles.choiceLabel, selected ? styles.choiceLabelSelected : null]}>
                 {option.label}
               </Text>
               {option.secondaryLabel ? (
-                <Text style={[styles.choiceSecondary, selected ? styles.choiceLabelSelected : null]}>
+                <Text
+                  style={[styles.choiceSecondary, selected ? styles.choiceLabelSelected : null]}
+                >
                   {option.secondaryLabel}
                 </Text>
               ) : null}
@@ -197,100 +203,100 @@ export function ChoiceGroup<T extends string>({
 
 const styles = StyleSheet.create({
   button: {
-    alignItems: "center",
+    alignItems: 'center',
     borderRadius: radii.md,
     borderWidth: 1,
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: spacing.md,
-    justifyContent: "center",
+    justifyContent: 'center',
     minHeight: control.minHeight,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md
+    paddingVertical: spacing.md,
   },
   buttonLabel: {
     fontSize: typography.body,
-    fontWeight: "700",
+    fontWeight: '700',
     lineHeight: 21,
-    textAlign: "center"
+    textAlign: 'center',
   },
   buttonSecondary: {
     fontSize: typography.caption,
     lineHeight: 17,
     opacity: 0.9,
-    textAlign: "center"
+    textAlign: 'center',
   },
   buttonTextGroup: {
     flexShrink: 1,
-    gap: 1
+    gap: 1,
   },
   choice: {
-    alignItems: "center",
+    alignItems: 'center',
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: radii.md,
     borderWidth: 1,
-    flexBasis: "47%",
+    flexBasis: '47%',
     flexGrow: 1,
-    justifyContent: "center",
+    justifyContent: 'center',
     minHeight: 64,
-    padding: spacing.sm
+    padding: spacing.sm,
   },
   choiceGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
   choiceLabel: {
     color: colors.ink,
     fontSize: typography.label,
-    fontWeight: "700",
-    textAlign: "center"
+    fontWeight: '700',
+    textAlign: 'center',
   },
   choiceLabelSelected: {
-    color: colors.primary
+    color: colors.primary,
   },
   choiceSecondary: {
     color: colors.muted,
     fontSize: typography.caption,
     lineHeight: 17,
-    textAlign: "center"
+    textAlign: 'center',
   },
   choiceSelected: {
     backgroundColor: colors.primarySoft,
     borderColor: colors.primary,
-    borderWidth: 2
+    borderWidth: 2,
   },
   disabled: {
-    opacity: 0.55
+    opacity: 0.55,
   },
   errorText: {
     color: colors.critical,
     fontSize: typography.caption,
-    lineHeight: 18
+    lineHeight: 18,
   },
   fieldGroup: {
-    gap: spacing.sm
+    gap: spacing.sm,
   },
   fieldLabel: {
     color: colors.ink,
     fontSize: typography.label,
-    fontWeight: "700",
-    lineHeight: 20
+    fontWeight: '700',
+    lineHeight: 20,
   },
   hintText: {
     color: colors.muted,
     fontSize: typography.caption,
-    lineHeight: 18
+    lineHeight: 18,
   },
   iconButton: {
-    alignItems: "center",
+    alignItems: 'center',
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: radii.md,
     borderWidth: 1,
     height: control.iconButton,
-    justifyContent: "center",
-    width: control.iconButton
+    justifyContent: 'center',
+    width: control.iconButton,
   },
   input: {
     backgroundColor: colors.surface,
@@ -301,17 +307,17 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     minHeight: control.minHeight,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md
+    paddingVertical: spacing.md,
   },
   inputError: {
-    borderColor: colors.critical
+    borderColor: colors.critical,
   },
   multiline: {
     minHeight: 104,
-    textAlignVertical: "top"
+    textAlignVertical: 'top',
   },
   pressed: {
     opacity: 0.78,
-    transform: [{ scale: 0.99 }]
-  }
+    transform: [{ scale: 0.99 }],
+  },
 });

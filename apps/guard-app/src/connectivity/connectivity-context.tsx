@@ -1,5 +1,5 @@
-import * as Network from "expo-network";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import * as Network from 'expo-network';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 interface ConnectivityState {
   isConnected: boolean;
@@ -12,7 +12,7 @@ const initialState: ConnectivityState = {
   isConnected: false,
   isInternetReachable: false,
   isOnline: false,
-  type: Network.NetworkStateType.UNKNOWN
+  type: Network.NetworkStateType.UNKNOWN,
 };
 
 const ConnectivityContext = createContext<ConnectivityState>(initialState);
@@ -24,7 +24,7 @@ function normalize(state: Network.NetworkState): ConnectivityState {
     isConnected,
     isInternetReachable,
     isOnline: isConnected && isInternetReachable,
-    type: state.type ?? Network.NetworkStateType.UNKNOWN
+    type: state.type ?? Network.NetworkStateType.UNKNOWN,
   };
 }
 

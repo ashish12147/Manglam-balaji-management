@@ -1,8 +1,8 @@
-import type { FieldErrors, FieldValues, Resolver } from "react-hook-form";
-import type { ZodType } from "zod";
+import type { FieldErrors, FieldValues, Resolver } from 'react-hook-form';
+import type { ZodType } from 'zod';
 
 export function zodFormResolver<TValues extends FieldValues>(
-  schema: ZodType<TValues>
+  schema: ZodType<TValues>,
 ): Resolver<TValues> {
   return async (values) => {
     const result = schema.safeParse(values);
@@ -12,7 +12,7 @@ export function zodFormResolver<TValues extends FieldValues>(
     const writableErrors = errors as Record<string, unknown>;
     for (const issue of result.error.issues) {
       const field = issue.path[0];
-      if (typeof field === "string" && writableErrors[field] === undefined) {
+      if (typeof field === 'string' && writableErrors[field] === undefined) {
         writableErrors[field] = { message: issue.message, type: issue.code };
       }
     }

@@ -1,18 +1,18 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
-import { SQLiteProvider } from "expo-sqlite";
-import { StatusBar } from "expo-status-bar";
-import { Suspense, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Stack } from 'expo-router';
+import { SQLiteProvider } from 'expo-sqlite';
+import { StatusBar } from 'expo-status-bar';
+import { Suspense, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { SessionProvider, useSession } from "@/auth/session-context";
-import { ConnectivityProvider } from "@/connectivity/connectivity-context";
-import { initializeGuardDatabase } from "@/offline/database";
-import { SyncProvider } from "@/offline/sync-context";
-import { PushProvider } from "@/notifications/push-context";
-import { RealtimeProvider } from "@/realtime/realtime-context";
-import { colors, spacing, typography } from "@/theme/tokens";
+import { SessionProvider, useSession } from '@/auth/session-context';
+import { ConnectivityProvider } from '@/connectivity/connectivity-context';
+import { initializeGuardDatabase } from '@/offline/database';
+import { SyncProvider } from '@/offline/sync-context';
+import { PushProvider } from '@/notifications/push-context';
+import { RealtimeProvider } from '@/realtime/realtime-context';
+import { colors, spacing, typography } from '@/theme/tokens';
 
 function BootScreen() {
   return (
@@ -26,17 +26,17 @@ function BootScreen() {
 
 function RootNavigator() {
   const session = useSession();
-  const signedIn = session.phase === "AUTHENTICATED";
+  const signedIn = session.phase === 'AUTHENTICATED';
   return (
     <Stack
       screenOptions={{
-        animation: "fade",
+        animation: 'fade',
         contentStyle: { backgroundColor: colors.background },
-        headerBackButtonDisplayMode: "minimal",
+        headerBackButtonDisplayMode: 'minimal',
         headerShadowVisible: false,
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.ink,
-        headerTitleStyle: { fontWeight: "700" }
+        headerTitleStyle: { fontWeight: '700' },
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -60,10 +60,10 @@ export default function RootLayout() {
             gcTime: 5 * 60_000,
             refetchOnReconnect: true,
             retry: 1,
-            staleTime: 10_000
-          }
-        }
-      })
+            staleTime: 10_000,
+          },
+        },
+      }),
   );
   return (
     <SafeAreaProvider>
@@ -95,21 +95,21 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   boot: {
-    alignItems: "center",
+    alignItems: 'center',
     backgroundColor: colors.background,
     flex: 1,
     gap: spacing.sm,
-    justifyContent: "center",
-    padding: spacing.xl
+    justifyContent: 'center',
+    padding: spacing.xl,
   },
   bootSubtitle: {
     color: colors.muted,
-    fontSize: typography.body
+    fontSize: typography.body,
   },
   bootTitle: {
     color: colors.ink,
     fontSize: typography.title,
-    fontWeight: "700",
-    marginTop: spacing.md
-  }
+    fontWeight: '700',
+    marginTop: spacing.md,
+  },
 });

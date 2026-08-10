@@ -67,7 +67,11 @@ function unwrapEnvelope<T>(value: unknown): T {
   return value as T;
 }
 
-function parseError(status: number, payload: unknown, responseCorrelationId: string | null): ApiError {
+function parseError(
+  status: number,
+  payload: unknown,
+  responseCorrelationId: string | null,
+): ApiError {
   const parsed = payload as ApiErrorPayload;
   const correlationId = parsed.error?.correlationId ?? responseCorrelationId ?? undefined;
   return new ApiError({
@@ -132,9 +136,10 @@ class ApiClient {
       options.idempotencyKey && !(options.body instanceof FormData)
         ? await idempotencyFingerprint(method, url, serializedBody)
         : null;
-    const effectiveIdempotencyKey = fingerprint && options.idempotencyKey
-      ? idempotencyKeyForRetry(fingerprint, options.idempotencyKey)
-      : options.idempotencyKey;
+    const effectiveIdempotencyKey =
+      fingerprint && options.idempotencyKey
+        ? idempotencyKeyForRetry(fingerprint, options.idempotencyKey)
+        : options.idempotencyKey;
     const controller = new AbortController();
     let timedOut = false;
     const timeoutId = setTimeout(() => {

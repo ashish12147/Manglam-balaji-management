@@ -54,8 +54,6 @@ export function pageResult<T extends { createdAt: Date; id: string }>(
   return {
     hasMore,
     items,
-    nextCursor: last
-      ? encodeCursor({ at: last.createdAt.toISOString(), id: last.id })
-      : null,
+    nextCursor: last ? encodeCursor({ at: last.createdAt.toISOString(), id: last.id }) : null,
   };
 }

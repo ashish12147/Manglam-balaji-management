@@ -1,12 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { HttpStatus, Injectable, type OnModuleInit } from '@nestjs/common';
-import {
-  AuditOutcome,
-  Prisma,
-  RecordStatus,
-  UserStatus,
-} from '@manglam/database';
+import { AuditOutcome, Prisma, RecordStatus, UserStatus } from '@manglam/database';
 
 import { ApiError } from '../../common/http/api-error.js';
 import { DatabaseService } from '../../infrastructure/database/database.service.js';
@@ -29,11 +24,7 @@ import {
   CredentialAttemptService,
   type CredentialAttemptKeys,
 } from './credential-attempt.service.js';
-import {
-  principalActor,
-  SessionService,
-  type SessionTokenResponse,
-} from './session.service.js';
+import { principalActor, SessionService, type SessionTokenResponse } from './session.service.js';
 
 export interface SetPinResponse {
   readonly updated: true;
@@ -66,10 +57,7 @@ export class ResidentPinService implements OnModuleInit {
     input: SetPinInput,
     context: MutationRequestContext,
   ): Promise<SetPinResponse> {
-    if (
-      principal.sessionKind !== 'RESIDENT' ||
-      !principal.recentlyAuthenticated
-    ) {
+    if (principal.sessionKind !== 'RESIDENT' || !principal.recentlyAuthenticated) {
       throw new ApiError({
         code: 'STEP_UP_REQUIRED',
         details: {},
@@ -80,11 +68,7 @@ export class ResidentPinService implements OnModuleInit {
 
     const actor = principalActor(principal);
     const requestContract = {
-      pinProof: this.digests.credentialProof(
-        input.pin,
-        'RESIDENT_APP_PIN',
-        principal.societyId,
-      ),
+      pinProof: this.digests.credentialProof(input.pin, 'RESIDENT_APP_PIN', principal.societyId),
     };
     const prior = await this.replay.find<SetPinResponse>({
       actor,
@@ -156,24 +140,14 @@ export class ResidentPinService implements OnModuleInit {
       method: 'RESIDENT_APP_PIN',
       societyId,
     });
-    const deviceDigest = this.digests.deviceFingerprint(
-      input.device.fingerprint,
-      societyId,
-    );
+    const deviceDigest = this.digests.deviceFingerprint(input.device.fingerprint, societyId);
     const actor: MutationActor = {
-      actorScopeKey: `resident-pin:${attemptKeys.subjectDigest}:${deviceDigest}`.slice(
-        0,
-        200,
-      ),
+      actorScopeKey: `resident-pin:${attemptKeys.subjectDigest}:${deviceDigest}`.slice(0, 200),
     };
     const requestContract = {
       device: { ...input.device, fingerprint: deviceDigest },
       phoneDigest: attemptKeys.subjectDigest,
-      pinProof: this.digests.credentialProof(
-        input.pin,
-        'RESIDENT_APP_PIN',
-        societyId,
-      ),
+      pinProof: this.digests.credentialProof(input.pin, 'RESIDENT_APP_PIN', societyId),
     };
     const prior = await this.replay.find<StoredOutcome<SessionTokenResponse>>({
       actor,
@@ -221,16 +195,13 @@ export class ResidentPinService implements OnModuleInit {
 
     const outcome = await this.database.client.$transaction(
       async (transaction) => {
-        const claim = await this.journal.begin<StoredOutcome<SessionTokenResponse>>(
-          transaction,
-          {
-            actor: { ...actor, userId: candidate?.id ?? null },
-            idempotencyKey: context.idempotencyKey,
-            operation: 'auth.pin.unlock',
-            request: requestContract,
-            societyId,
-          },
-        );
+        const claim = await this.journal.begin<StoredOutcome<SessionTokenResponse>>(transaction, {
+          actor: { ...actor, userId: candidate?.id ?? null },
+          idempotencyKey: context.idempotencyKey,
+          operation: 'auth.pin.unlock',
+          request: requestContract,
+          societyId,
+        });
         if (claim.kind === 'replay') return claim.response;
 
         const allowed = await this.attempts.allowed(transaction, {

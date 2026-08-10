@@ -1,8 +1,14 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, spacing, typography } from "@/theme/tokens";
+import { colors, spacing, typography } from '@/theme/tokens';
 
-export function PageTitle({ children, subtitle }: { children: React.ReactNode; subtitle?: string }) {
+export function PageTitle({
+  children,
+  subtitle,
+}: {
+  children: React.ReactNode;
+  subtitle?: string;
+}) {
   return (
     <View style={styles.titleGroup}>
       <Text accessibilityRole="header" style={styles.pageTitle}>
@@ -13,7 +19,13 @@ export function PageTitle({ children, subtitle }: { children: React.ReactNode; s
   );
 }
 
-export function SectionTitle({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
+export function SectionTitle({
+  children,
+  action,
+}: {
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
   return (
     <View style={styles.sectionRow}>
       <Text accessibilityRole="header" style={styles.sectionTitle}>
@@ -32,34 +44,34 @@ const styles = StyleSheet.create({
   hindi: {
     color: colors.muted,
     fontSize: typography.caption,
-    lineHeight: 18
+    lineHeight: 18,
   },
   pageTitle: {
     color: colors.ink,
     fontSize: typography.heading,
-    fontWeight: "800",
-    lineHeight: 30
+    fontWeight: '800',
+    lineHeight: 30,
   },
   sectionRow: {
-    alignItems: "center",
-    flexDirection: "row",
+    alignItems: 'center',
+    flexDirection: 'row',
     gap: spacing.md,
-    justifyContent: "space-between",
-    minHeight: 32
+    justifyContent: 'space-between',
+    minHeight: 32,
   },
   sectionTitle: {
     color: colors.ink,
     flexShrink: 1,
     fontSize: typography.title,
-    fontWeight: "700",
-    lineHeight: 26
+    fontWeight: '700',
+    lineHeight: 26,
   },
   subtitle: {
     color: colors.muted,
     fontSize: typography.body,
-    lineHeight: 23
+    lineHeight: 23,
   },
   titleGroup: {
-    gap: spacing.xs
-  }
+    gap: spacing.xs,
+  },
 });

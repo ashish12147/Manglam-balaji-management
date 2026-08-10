@@ -23,8 +23,6 @@ describe('ambiguous idempotency retries', () => {
 
   it('expires retained keys with the server idempotency window', () => {
     retainIdempotencyKey('request-a', 'original', 1_000);
-    expect(
-      idempotencyKeyForRetry('request-a', 'new', 1_000 + 24 * 60 * 60_000),
-    ).toBe('new');
+    expect(idempotencyKeyForRetry('request-a', 'new', 1_000 + 24 * 60 * 60_000)).toBe('new');
   });
 });

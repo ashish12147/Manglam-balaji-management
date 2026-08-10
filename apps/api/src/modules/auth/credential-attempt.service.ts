@@ -12,10 +12,7 @@ export type AuthenticationMethodContract =
   | 'RESIDENT_APP_PIN'
   | 'TOTP';
 
-export type AuthenticationAttemptOutcomeContract =
-  | 'BLOCKED'
-  | 'FAILURE'
-  | 'SUCCESS';
+export type AuthenticationAttemptOutcomeContract = 'BLOCKED' | 'FAILURE' | 'SUCCESS';
 
 export interface CredentialAttemptKeys {
   readonly originDigest: string | null;

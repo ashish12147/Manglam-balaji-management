@@ -38,14 +38,10 @@ export class DatabaseTotpMfaVerifier implements MfaVerifier {
     const configuredVersion = Number(process.env.MFA_ENCRYPTION_KEY_VERSION);
     this.key = decodeEncryptionKey(configuredKey);
     this.keyVersion =
-      Number.isSafeInteger(configuredVersion) && configuredVersion > 0
-        ? configuredVersion
-        : null;
+      Number.isSafeInteger(configuredVersion) && configuredVersion > 0 ? configuredVersion : null;
   }
 
-  async verify(
-    request: MfaVerificationRequest,
-  ): Promise<MfaVerificationResult> {
+  async verify(request: MfaVerificationRequest): Promise<MfaVerificationResult> {
     if (!/^\d{6}$/.test(request.code) || !this.key || !this.keyVersion) {
       return 'UNAVAILABLE';
     }
@@ -77,11 +73,7 @@ export class DatabaseTotpMfaVerifier implements MfaVerifier {
           if (!credential) {
             return 'UNAVAILABLE';
           }
-          const secret = this.decryptCredential(
-            credential,
-            request.societyId,
-            request.userId,
-          );
+          const secret = this.decryptCredential(credential, request.societyId, request.userId);
           if (!secret) {
             return 'UNAVAILABLE';
           }
@@ -137,17 +129,10 @@ export class DatabaseTotpMfaVerifier implements MfaVerifier {
 
     try {
       const aad = `${societyId}:${userId}:TOTP:v${credential.keyVersion}`;
-      const decipher = createDecipheriv(
-        'aes-256-gcm',
-        this.key,
-        credential.secretNonce,
-      );
+      const decipher = createDecipheriv('aes-256-gcm', this.key, credential.secretNonce);
       decipher.setAAD(Buffer.from(aad, 'utf8'));
       decipher.setAuthTag(credential.secretAuthTag);
-      return Buffer.concat([
-        decipher.update(credential.secretCiphertext),
-        decipher.final(),
-      ]);
+      return Buffer.concat([decipher.update(credential.secretCiphertext), decipher.final()]);
     } catch {
       return null;
     }

@@ -10,28 +10,19 @@ export function verifyTotpCode(input: {
   readonly now: Date;
   readonly secret: Buffer;
 }): bigint | null {
-  if (
-    !/^\d{6}$/.test(input.candidate) ||
-    input.secret.length < 20 ||
-    input.secret.length > 128
-  ) {
+  if (!/^\d{6}$/.test(input.candidate) || input.secret.length < 20 || input.secret.length > 128) {
     return null;
   }
 
   const candidate = Buffer.from(input.candidate, 'ascii');
-  const currentStep = BigInt(
-    Math.floor(input.now.getTime() / 1_000 / TOTP_PERIOD_SECONDS),
-  );
+  const currentStep = BigInt(Math.floor(input.now.getTime() / 1_000 / TOTP_PERIOD_SECONDS));
   for (const offset of CLOCK_SKEW_STEPS) {
     const step = currentStep + offset;
     if (step < 0n || (input.lastUsedStep !== null && step <= input.lastUsedStep)) {
       continue;
     }
     const expected = Buffer.from(totpAt(input.secret, step), 'ascii');
-    if (
-      candidate.length === expected.length &&
-      timingSafeEqual(candidate, expected)
-    ) {
+    if (candidate.length === expected.length && timingSafeEqual(candidate, expected)) {
       return step;
     }
   }

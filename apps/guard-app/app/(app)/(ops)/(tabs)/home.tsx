@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   BadgeCheck,
@@ -7,23 +7,23 @@ import {
   ScanLine,
   UserPlus,
   UserRoundCheck,
-  UsersRound
-} from "lucide-react-native";
-import { useRouter } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+  UsersRound,
+} from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { endpoints } from "@/api/endpoints";
-import { useSession } from "@/auth/session-context";
-import { ActionButton } from "@/components/Controls";
-import { RecordItem } from "@/components/Records";
-import { Screen } from "@/components/Screen";
-import { ErrorPanel, LoadingPanel, StatePanel } from "@/components/StatePanel";
-import { StatusBadge } from "@/components/Status";
-import { PageTitle, SectionTitle } from "@/components/Typography";
-import { useConnectivity } from "@/connectivity/connectivity-context";
-import { useSync } from "@/offline/sync-context";
-import { colors, radii, spacing, typography } from "@/theme/tokens";
-import { formatRelativeAge } from "@/utils/date";
+import { endpoints } from '@/api/endpoints';
+import { useSession } from '@/auth/session-context';
+import { ActionButton } from '@/components/Controls';
+import { RecordItem } from '@/components/Records';
+import { Screen } from '@/components/Screen';
+import { ErrorPanel, LoadingPanel, StatePanel } from '@/components/StatePanel';
+import { StatusBadge } from '@/components/Status';
+import { PageTitle, SectionTitle } from '@/components/Typography';
+import { useConnectivity } from '@/connectivity/connectivity-context';
+import { useSync } from '@/offline/sync-context';
+import { colors, radii, spacing, typography } from '@/theme/tokens';
+import { formatRelativeAge } from '@/utils/date';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -33,8 +33,8 @@ export default function HomeScreen() {
   const dashboard = useQuery({
     enabled: connectivity.isOnline,
     queryFn: endpoints.dashboard,
-    queryKey: ["dashboard", session.metadata?.activeGate?.id],
-    refetchInterval: 10_000
+    queryKey: ['dashboard', session.metadata?.activeGate?.id],
+    refetchInterval: 10_000,
   });
   const refresh = async () => {
     await Promise.all([dashboard.refetch(), sync.refreshSnapshot(true), sync.syncNow()]);
@@ -42,12 +42,12 @@ export default function HomeScreen() {
   return (
     <Screen onRefresh={() => void refresh()} refreshing={dashboard.isRefetching || sync.isSyncing}>
       <View style={styles.headingRow}>
-        <PageTitle subtitle={session.metadata?.activeGate?.name ?? "No gate selected"}>
+        <PageTitle subtitle={session.metadata?.activeGate?.name ?? 'No gate selected'}>
           Gate operations / गेट कार्य
         </PageTitle>
         <StatusBadge
-          label={connectivity.isOnline ? "ONLINE" : "OFFLINE"}
-          tone={connectivity.isOnline ? "success" : "warning"}
+          label={connectivity.isOnline ? 'ONLINE' : 'OFFLINE'}
+          tone={connectivity.isOnline ? 'success' : 'warning'}
         />
       </View>
 
@@ -56,7 +56,7 @@ export default function HomeScreen() {
           <ActionButton
             icon={UserPlus}
             label="Register visitor"
-            onPress={() => router.push("/visitor/new")}
+            onPress={() => router.push('/visitor/new')}
             secondaryLabel="विज़िटर दर्ज करें"
           />
         </View>
@@ -65,7 +65,7 @@ export default function HomeScreen() {
             disabled={!connectivity.isOnline}
             icon={ScanLine}
             label="Verify code"
-            onPress={() => router.push("/visitor/code")}
+            onPress={() => router.push('/visitor/code')}
             secondaryLabel="कोड जांचें"
             variant="secondary"
           />
@@ -74,7 +74,7 @@ export default function HomeScreen() {
           <ActionButton
             icon={UsersRound}
             label="Active visits"
-            onPress={() => router.push("/visitor/active")}
+            onPress={() => router.push('/visitor/active')}
             secondaryLabel="सक्रिय विज़िटर"
             variant="secondary"
           />
@@ -83,7 +83,7 @@ export default function HomeScreen() {
           <ActionButton
             icon={UserRoundCheck}
             label="Daily help"
-            onPress={() => router.push("/daily-help")}
+            onPress={() => router.push('/daily-help')}
             secondaryLabel="दैनिक सहायक"
             variant="secondary"
           />
@@ -100,12 +100,20 @@ export default function HomeScreen() {
       ) : dashboard.isLoading ? (
         <LoadingPanel label="Loading live gate status…" />
       ) : dashboard.isError ? (
-        <ErrorPanel message={(dashboard.error as Error).message} onRetry={() => void dashboard.refetch()} />
+        <ErrorPanel
+          message={(dashboard.error as Error).message}
+          onRetry={() => void dashboard.refetch()}
+        />
       ) : dashboard.data ? (
         <>
           <View style={styles.metrics}>
             <Metric icon={Clock3} label="Approvals" value={dashboard.data.pendingApprovals} />
-            <Metric icon={AlertTriangle} label="Emergencies" tone="critical" value={dashboard.data.activeEmergencies} />
+            <Metric
+              icon={AlertTriangle}
+              label="Emergencies"
+              tone="critical"
+              value={dashboard.data.activeEmergencies}
+            />
             <Metric icon={Package} label="Held parcels" value={dashboard.data.heldParcels} />
             <Metric icon={BadgeCheck} label="Inside" value={dashboard.data.activeVisits} />
           </View>
@@ -113,14 +121,17 @@ export default function HomeScreen() {
             <ActionButton
               icon={AlertTriangle}
               label={`${dashboard.data.activeEmergencies} active emergency alert(s)`}
-              onPress={() => router.push("/emergency")}
+              onPress={() => router.push('/emergency')}
               secondaryLabel="तुरंत देखें"
               variant="danger"
             />
           ) : null}
           <SectionTitle>Recent activity / हाल की गतिविधि</SectionTitle>
           {dashboard.data.recentActivity.length === 0 ? (
-            <StatePanel detail="No gate activity has been recorded yet." title="No recent activity" />
+            <StatePanel
+              detail="No gate activity has been recorded yet."
+              title="No recent activity"
+            />
           ) : (
             <View style={styles.records}>
               {dashboard.data.recentActivity.slice(0, 5).map((activity) => (
@@ -129,7 +140,7 @@ export default function HomeScreen() {
                   icon={Clock3}
                   key={activity.id}
                   meta={formatRelativeAge(activity.occurredAt)}
-                  onPress={() => router.push("/activity")}
+                  onPress={() => router.push('/activity')}
                   status={activity.status}
                   title={activity.title}
                 />
@@ -145,18 +156,20 @@ export default function HomeScreen() {
 function Metric({
   icon: Icon,
   label,
-  tone = "normal",
-  value
+  tone = 'normal',
+  value,
 }: {
   icon: typeof Clock3;
   label: string;
-  tone?: "critical" | "normal";
+  tone?: 'critical' | 'normal';
   value: number;
 }) {
   return (
     <View style={styles.metric}>
-      <Icon color={tone === "critical" ? colors.critical : colors.primary} size={24} />
-      <Text style={[styles.metricValue, tone === "critical" ? styles.metricCritical : null]}>{value}</Text>
+      <Icon color={tone === 'critical' ? colors.critical : colors.primary} size={24} />
+      <Text style={[styles.metricValue, tone === 'critical' ? styles.metricCritical : null]}>
+        {value}
+      </Text>
       <Text style={styles.metricLabel}>{label}</Text>
     </View>
   );
@@ -164,54 +177,54 @@ function Metric({
 
 const styles = StyleSheet.create({
   actionCell: {
-    flexBasis: "47%",
+    flexBasis: '47%',
     flexGrow: 1,
-    minWidth: 150
+    minWidth: 150,
   },
   actionGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
   headingRow: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.md,
-    justifyContent: "space-between"
+    justifyContent: 'space-between',
   },
   metric: {
-    alignItems: "center",
+    alignItems: 'center',
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: radii.md,
     borderWidth: 1,
-    flexBasis: "22%",
+    flexBasis: '22%',
     flexGrow: 1,
     gap: spacing.xs,
     minHeight: 110,
     minWidth: 130,
-    padding: spacing.md
+    padding: spacing.md,
   },
   metricCritical: {
-    color: colors.critical
+    color: colors.critical,
   },
   metricLabel: {
     color: colors.muted,
     fontSize: typography.caption,
-    textAlign: "center"
+    textAlign: 'center',
   },
   metricValue: {
     color: colors.ink,
     fontSize: 28,
-    fontWeight: "800"
+    fontWeight: '800',
   },
   metrics: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
   records: {
-    gap: spacing.sm
-  }
+    gap: spacing.sm,
+  },
 });

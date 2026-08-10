@@ -60,15 +60,20 @@ export const guardEnrollBodySchema = guardSignInBodySchema
 export const adminSignInBodySchema = z
   .object({
     device: authDeviceSchema,
-    email: z.string().email().max(254).transform((value) => value.toLowerCase()),
-    mfaCode: z.string().regex(/^\d{6}$/).optional(),
+    email: z
+      .string()
+      .email()
+      .max(254)
+      .transform((value) => value.toLowerCase()),
+    mfaCode: z
+      .string()
+      .regex(/^\d{6}$/)
+      .optional(),
     password: z.string().min(8).max(256),
   })
   .strict();
 
-export const setPinBodySchema = z
-  .object({ pin: z.string().regex(/^\d{4,12}$/) })
-  .strict();
+export const setPinBodySchema = z.object({ pin: z.string().regex(/^\d{4,12}$/) }).strict();
 
 export const pinUnlockBodySchema = z
   .object({
@@ -78,9 +83,7 @@ export const pinUnlockBodySchema = z
   })
   .strict();
 
-export const revokeSessionBodySchema = z
-  .object({ reason: reasonSchema.optional() })
-  .strict();
+export const revokeSessionBodySchema = z.object({ reason: reasonSchema.optional() }).strict();
 
 export const profileUpdateBodySchema = z
   .object({

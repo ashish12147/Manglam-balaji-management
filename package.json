@@ -28,7 +28,7 @@
     "test": "turbo run test",
     "test:coverage": "turbo run test:coverage",
     "test:e2e": "turbo run test:e2e",
-    "test:integration": "turbo run test:integration",
+    "test:integration": "pnpm --filter @manglam/database test:integration && pnpm --filter @manglam/worker... build && pnpm --filter @manglam/worker test:integration",
     "typecheck": "turbo run typecheck",
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
@@ -36,6 +36,8 @@
     "@playwright/test": "1.61.1",
     "@types/node": "24.10.1",
     "eslint": "9.39.1",
+    "expo": "56.0.16",
+    "expo-router": "56.2.15",
     "prettier": "3.7.4",
     "rimraf": "6.1.2",
     "turbo": "2.6.3",

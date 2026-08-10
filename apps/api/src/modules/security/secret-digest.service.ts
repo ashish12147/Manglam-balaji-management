@@ -37,11 +37,7 @@ export class SecretDigestService {
   }
 
   credentialProof(value: string, purpose: string, societyId: string): string {
-    return secretDigest(
-      value,
-      ['credential-proof', societyId, purpose],
-      this.refreshSecret,
-    );
+    return secretDigest(value, ['credential-proof', societyId, purpose], this.refreshSecret);
   }
 
   deviceFingerprint(fingerprint: string, societyId: string): string {
@@ -53,11 +49,7 @@ export class SecretDigestService {
   }
 
   guardEnrollmentToken(token: string, societyId: string, guardDeviceId: string): string {
-    return secretDigest(
-      token,
-      ['guard-enrollment', societyId, guardDeviceId],
-      this.refreshSecret,
-    );
+    return secretDigest(token, ['guard-enrollment', societyId, guardDeviceId], this.refreshSecret);
   }
 
   phone(phoneE164: string, societyId: string): string {
@@ -73,10 +65,6 @@ export class SecretDigestService {
   }
 
   visitorCode(code: string, societyId: string): string {
-    return secretDigest(
-      code.toUpperCase(),
-      ['visitor-code', societyId],
-      this.visitorSecret,
-    );
+    return secretDigest(code.toUpperCase(), ['visitor-code', societyId], this.visitorSecret);
   }
 }

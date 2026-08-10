@@ -1,5 +1,5 @@
-import type { OfflineMutationResult } from "@/api/endpoints";
-import type { SyncStatus } from "@/types/domain";
+import type { OfflineMutationResult } from '@/api/endpoints';
+import type { SyncStatus } from '@/types/domain';
 
 export interface QueueState {
   attemptCount: number;
@@ -13,11 +13,11 @@ export interface QueueState {
 }
 
 const transitions: Record<SyncStatus, ReadonlySet<SyncStatus>> = {
-  CONFLICT: new Set(["LOCAL_PENDING"]),
-  FAILED: new Set(["LOCAL_PENDING", "SYNCING"]),
-  LOCAL_PENDING: new Set(["SYNCING"]),
+  CONFLICT: new Set(['LOCAL_PENDING']),
+  FAILED: new Set(['LOCAL_PENDING', 'SYNCING']),
+  LOCAL_PENDING: new Set(['SYNCING']),
   SYNCED: new Set(),
-  SYNCING: new Set(["CONFLICT", "FAILED", "SYNCED"])
+  SYNCING: new Set(['CONFLICT', 'FAILED', 'SYNCED']),
 };
 
 export function canTransition(from: SyncStatus, to: SyncStatus): boolean {
@@ -30,12 +30,12 @@ export function transitionQueueState(current: QueueState, next: SyncStatus): Que
   }
   return {
     ...current,
-    attemptCount: next === "SYNCING" ? current.attemptCount + 1 : current.attemptCount,
-    conflict: next === "LOCAL_PENDING" ? null : current.conflict,
-    errorCode: next === "LOCAL_PENDING" || next === "SYNCING" ? null : current.errorCode,
-    errorMessage: next === "LOCAL_PENDING" || next === "SYNCING" ? null : current.errorMessage,
-    nextAttemptAt: next === "LOCAL_PENDING" || next === "SYNCING" ? null : current.nextAttemptAt,
-    status: next
+    attemptCount: next === 'SYNCING' ? current.attemptCount + 1 : current.attemptCount,
+    conflict: next === 'LOCAL_PENDING' ? null : current.conflict,
+    errorCode: next === 'LOCAL_PENDING' || next === 'SYNCING' ? null : current.errorCode,
+    errorMessage: next === 'LOCAL_PENDING' || next === 'SYNCING' ? null : current.errorMessage,
+    nextAttemptAt: next === 'LOCAL_PENDING' || next === 'SYNCING' ? null : current.nextAttemptAt,
+    status: next,
   };
 }
 
@@ -46,31 +46,32 @@ export function retryDelayMs(attemptCount: number): number {
 export function applyServerResult(
   current: QueueState,
   result: OfflineMutationResult,
-  nowMs: number = Date.now()
+  nowMs: number = Date.now(),
 ): QueueState {
-  if (current.status !== "SYNCING") {
+  if (current.status !== 'SYNCING') {
     throw new Error(`A server result cannot be applied while mutation is ${current.status}.`);
   }
 
-  if (result.status === "SYNCED") {
+  if (result.status === 'SYNCED') {
     return {
-      ...transitionQueueState(current, "SYNCED"),
+      ...transitionQueueState(current, 'SYNCED'),
       conflict: null,
       errorCode: null,
       errorMessage: null,
       nextAttemptAt: null,
       serverOccurredAt: result.serverOccurredAt ?? null,
-      serverRecordId: result.serverRecordId ?? null
+      serverRecordId: result.serverRecordId ?? null,
     };
   }
 
-  if (result.status === "CONFLICT") {
+  if (result.status === 'CONFLICT') {
     return {
-      ...transitionQueueState(current, "CONFLICT"),
+      ...transitionQueueState(current, 'CONFLICT'),
       conflict: result.serverState ?? null,
-      errorCode: result.code ?? "SYNC_CONFLICT",
-      errorMessage: result.message ?? "The server record changed before this action was synchronized.",
-      nextAttemptAt: null
+      errorCode: result.code ?? 'SYNC_CONFLICT',
+      errorMessage:
+        result.message ?? 'The server record changed before this action was synchronized.',
+      nextAttemptAt: null,
     };
   }
 
@@ -78,16 +79,16 @@ export function applyServerResult(
     ? new Date(nowMs + retryDelayMs(current.attemptCount)).toISOString()
     : null;
   return {
-    ...transitionQueueState(current, "FAILED"),
-    errorCode: result.code ?? "SYNC_FAILED",
-    errorMessage: result.message ?? "The server did not accept this offline action.",
-    nextAttemptAt
+    ...transitionQueueState(current, 'FAILED'),
+    errorCode: result.code ?? 'SYNC_FAILED',
+    errorMessage: result.message ?? 'The server did not accept this offline action.',
+    nextAttemptAt,
   };
 }
 
 export function shouldAttempt(state: QueueState, nowMs: number = Date.now()): boolean {
-  if (state.status === "LOCAL_PENDING") return true;
-  if (state.status !== "FAILED" || !state.nextAttemptAt) return false;
+  if (state.status === 'LOCAL_PENDING') return true;
+  if (state.status !== 'FAILED' || !state.nextAttemptAt) return false;
   const retryAt = new Date(state.nextAttemptAt).getTime();
   return !Number.isNaN(retryAt) && retryAt <= nowMs;
 }
