@@ -49,7 +49,7 @@ describe('worker PostgreSQL and Redis integration', () => {
           `INSERT INTO societies (id, singleton_key, name, updated_at)
            VALUES ($1, $2, 'Worker integration test', NOW())`,
           societyId,
-          `WK_${societyId.slice(0, 20)}`,
+          'MANGLAM_BALAJI',
         );
         societyInserted = true;
         await database.$executeRawUnsafe(
